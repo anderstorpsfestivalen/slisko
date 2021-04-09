@@ -46,7 +46,7 @@ func painter(c chassi.Chassi) {
 
 			for _, p := range c.LinkPorts {
 				//m := 1.0
-				p.B = 1.0
+				p.SetClamped(1.0, 0.5, 0.3)
 			}
 
 		}

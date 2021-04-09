@@ -40,9 +40,9 @@ func (c *Chassi) getstatusLEDs() []*pixel.Pixel {
 
 func (c *Chassi) getleds() []*pixel.Pixel {
 	lp := []*pixel.Pixel{}
-	for _, lc := range c.LineCards {
-		for _, ld := range lc.LEDs {
-			lp = append(lp, &ld)
+	for v, lc := range c.LineCards {
+		for z, _ := range lc.LEDs {
+			lp = append(lp, &c.LineCards[v].LEDs[z])
 		}
 	}
 	return lp
