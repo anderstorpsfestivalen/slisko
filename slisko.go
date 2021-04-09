@@ -62,7 +62,7 @@ func painter(c chassi.Chassi) {
 			}
 
 			for _, p := range c.StatusLEDs {
-				p.SetClamped(0.1, 1.0, 0.0)
+				p.SetClamped(1.0, 0.0, 0.0)
 			}
 
 			for _, p := range c.LinkPorts {
