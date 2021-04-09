@@ -42,6 +42,12 @@ func painter(c chassi.Chassi) {
 		for {
 			_ = <-ticker.C
 			m = m + 0.01
+
+			for _, c := range c.LineCards {
+				if c.Name == "sup720" {
+					c.Misc["disk0"].SetClamped(1.0, 0.2, 0.0)
+				}
+			}
 			for _, p := range c.StatusLEDs {
 				p.SetClamped(0.1, 1.0, 0.0)
 			}
