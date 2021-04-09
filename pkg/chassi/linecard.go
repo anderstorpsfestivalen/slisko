@@ -20,7 +20,7 @@ func getSliceAddr(slice []pixel.Pixel, s int, e int) []*pixel.Pixel {
 	ym := make([]*pixel.Pixel, e-s)
 	k := 0
 	for i := s; i < e; i++ {
-		ym[k] = &slice[i-1]
+		ym[k] = &slice[i]
 		k++
 	}
 	return ym

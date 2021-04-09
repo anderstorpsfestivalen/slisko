@@ -25,7 +25,9 @@ func New(l []LineCard) Chassi {
 func (c *Chassi) getlinkPorts() []*pixel.Pixel {
 	lp := []*pixel.Pixel{}
 	for _, lc := range c.LineCards {
-		lp = append(lp, lc.Link...)
+		if lc.Active {
+			lp = append(lp, lc.Link...)
+		}
 	}
 	return lp
 }
@@ -33,7 +35,9 @@ func (c *Chassi) getlinkPorts() []*pixel.Pixel {
 func (c *Chassi) getstatusLEDs() []*pixel.Pixel {
 	lp := []*pixel.Pixel{}
 	for _, lc := range c.LineCards {
-		lp = append(lp, lc.Status)
+		if lc.Active {
+			lp = append(lp, lc.Status)
+		}
 	}
 	return lp
 }
