@@ -4,6 +4,12 @@ import (
 	"github.com/anderstorpsfestivalen/slisko/pkg/pixel"
 )
 
+type VirtualLED struct {
+	X    float64
+	Y    float64
+	Size float64
+}
+
 type LineCard struct {
 	Name   string
 	Image  string
@@ -13,6 +19,8 @@ type LineCard struct {
 	Status *pixel.Pixel
 	Link   []*pixel.Pixel
 	Misc   map[string]*pixel.Pixel
+
+	Pos []VirtualLED
 }
 
 func getSliceAddr(slice []pixel.Pixel, s int, e int) []*pixel.Pixel {
