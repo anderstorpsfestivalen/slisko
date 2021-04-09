@@ -6,7 +6,7 @@ func Gen6478() LineCard {
 
 	leds := make([]pixel.Pixel, 49)
 
-	return LineCard{
+	l := LineCard{
 		Name:   "6478",
 		Image:  "6478.png",
 		Active: true,
@@ -15,6 +15,24 @@ func Gen6478() LineCard {
 		Status: &leds[0],
 		Link:   getSliceAddr(leds, 1, 49),
 	}
+
+	setManyPixelPositons(l.LEDs, []pixel.Position{
+		{X: 11, Y: 73, Size: 5},
+
+		{X: 11, Y: 88, Size: 5},
+		{X: 11, Y: 101, Size: 5},
+		{X: 11, Y: 114, Size: 5},
+		{X: 11, Y: 128, Size: 5},
+		{X: 11, Y: 141, Size: 5},
+		{X: 11, Y: 154, Size: 5},
+		{X: 11, Y: 167, Size: 5},
+		{X: 11, Y: 180, Size: 5},
+		{X: 11, Y: 194, Size: 5},
+		{X: 11, Y: 207, Size: 5},
+		{X: 11, Y: 220, Size: 5},
+		{X: 11, Y: 233, Size: 5},
+	})
+	return l
 }
 
 func Gen6704() LineCard {

@@ -9,6 +9,7 @@ import (
 
 	"github.com/anderstorpsfestivalen/slisko/pkg/chassi"
 	"github.com/faiface/pixel"
+	"github.com/faiface/pixel/imdraw"
 	"github.com/faiface/pixel/pixelgl"
 )
 
@@ -19,6 +20,7 @@ type Simulator struct {
 	fps    int
 
 	glcs []glc
+	LEDs []*imdraw.IMDraw
 }
 
 type glc struct {
@@ -60,12 +62,17 @@ func (s *Simulator) run() {
 
 	for !win.Closed() {
 
+		s.generateLEDs(win)
+
 		for i, _ := range s.c.LineCards {
 			s.glcs[i].Sprite.Draw(win,
 				pixel.IM.Moved(
 					win.Bounds().Center().
 						Sub(pixel.V(432, 0)).
 						Add(s.glcs[i].Pos)))
+		}
+		for _, p := range s.LEDs {
+			p.Draw(win)
 		}
 
 		win.Update()
@@ -90,6 +97,24 @@ func (s *Simulator) loadCardDefinitons([]chassi.LineCard) error {
 	}
 
 	return nil
+}
+
+func (s *Simulator) generateLEDs(w *pixelgl.Window) {
+
+	bounds := w.Bounds()
+	s.LEDs = s.LEDs[:0]
+
+	for i, lc := range s.c.LineCards {
+		for _, pi := range lc.LEDs {
+			pos := pi.GetPositon()
+			p := imdraw.New(nil)
+			p.Color = pixel.RGB(pi.R, pi.G, pi.B)
+			p.Push(pixel.V(pos.X+(108*float64(i)), bounds.Max.Y-pos.Y))
+			p.Circle(pos.Size, 0)
+
+			s.LEDs = append(s.LEDs, p)
+		}
+	}
 }
 
 func loadPicture(path string) (pixel.Picture, error) {

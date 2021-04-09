@@ -36,17 +36,17 @@ func main() {
 }
 
 func painter(c chassi.Chassi) {
-	//t := time.Now()
 	ticker := time.NewTicker((1000 / 60) * time.Millisecond)
 	go func() {
+		m := 0.0
 		for {
 			_ = <-ticker.C
-
-			//t := time.Since(t)
-
+			m = m + 0.01
 			for _, p := range c.LinkPorts {
-				//m := 1.0
-				p.SetClamped(1.0, 0.5, 0.3)
+				p.SetClamped(m, m, 0.3)
+			}
+			if m > 1 {
+				m = 0
 			}
 
 		}
