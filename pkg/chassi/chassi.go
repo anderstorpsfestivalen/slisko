@@ -70,7 +70,7 @@ func (c *Chassi) GetCardOrder() []string {
 	return st
 }
 
-func (c *Chassi) GetLEDWithLabel(label string) []*pixel.Pixel {
+func (c *Chassi) GetLEDsWithLabel(label string) []*pixel.Pixel {
 	d := []*pixel.Pixel{}
 	for i, _ := range c.LineCards {
 		if val, ok := c.LineCards[i].Labeled[label]; ok {

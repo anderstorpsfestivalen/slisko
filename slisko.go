@@ -46,9 +46,15 @@ func painter(c chassi.Chassi) {
 			for _, c := range c.GetCardOfType("sup720") {
 				c.Labeled["disk0"].SetClamped(1.0, 0.2, 0.0)
 			}
+
+			for _, l := range c.GetLEDsWithLabel("mgmt") {
+				l.SetClamped(1.0, 0.4, 0.7)
+			}
+
 			for _, p := range c.StatusLEDs {
 				p.SetClamped(0.1, 1.0, 0.0)
 			}
+
 			for _, p := range c.LinkPorts {
 				p.SetClamped(m, m, 0.3)
 			}
