@@ -31,7 +31,7 @@ func main() {
 
 	painter(c)
 
-	sim := simulator.New(c, 1024, 768, 60)
+	sim := simulator.New(c, (108 * 9), 1000, 60)
 	sim.Start()
 
 }

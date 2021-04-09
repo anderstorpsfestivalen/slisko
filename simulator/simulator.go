@@ -18,7 +18,8 @@ type Simulator struct {
 	height int
 	fps    int
 
-	tex []pixel.Picture
+	tex     []pixel.Picture
+	sprites []*pixel.Sprite
 }
 
 func New(c chassi.Chassi, width int, height int, fps int) Simulator {
@@ -35,12 +36,9 @@ func (s *Simulator) Start() {
 }
 
 func (s *Simulator) run() {
-	for _, lc := range s.c.LineCards {
-		tex, err := loadPicture("assets/images/" + lc.Image)
-		if err != nil {
-			panic(err)
-		}
-		s.tex = append(s.tex, tex)
+	err := s.loadSprites(s.c.LineCards)
+	if err != nil {
+		panic(err)
 	}
 
 	cfg := pixelgl.WindowConfig{
@@ -57,10 +55,31 @@ func (s *Simulator) run() {
 
 	for !win.Closed() {
 
+		for i, _ := range s.c.LineCards {
+			s.sprites[i].Draw(win, pixel.IM.Moved(win.Bounds().Center()))
+		}
+
 		win.Update()
 		<-fps
 	}
 
+}
+
+func (s *Simulator) loadSprites([]chassi.LineCard) error {
+	for _, lc := range s.c.LineCards {
+		tex, err := loadPicture("assets/images/" + lc.Image)
+		if err != nil {
+			return err
+		}
+		s.tex = append(s.tex, tex)
+	}
+
+	for _, tex := range s.tex {
+		spr := pixel.NewSprite(tex, tex.Bounds())
+		s.sprites = append(s.sprites, spr)
+	}
+
+	return nil
 }
 
 func loadPicture(path string) (pixel.Picture, error) {
