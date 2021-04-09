@@ -1,7 +1,6 @@
 package main
 
 import (
-	"math"
 	"time"
 
 	"github.com/anderstorpsfestivalen/slisko/pkg/chassi"
@@ -37,18 +36,19 @@ func main() {
 }
 
 func painter(c chassi.Chassi) {
-	t := time.Now()
+	//t := time.Now()
 	ticker := time.NewTicker((1000 / 60) * time.Millisecond)
 	go func() {
 		for {
 			_ = <-ticker.C
 
-			t := time.Since(t)
+			//t := time.Since(t)
 
 			for _, p := range c.LinkPorts {
-				m := math.Sin(float64(t.Milliseconds()))
-				p.SetClamped(m, m, m)
+				//m := 1.0
+				p.B = 1.0
 			}
+
 		}
 	}()
 }

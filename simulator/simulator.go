@@ -18,8 +18,13 @@ type Simulator struct {
 	height int
 	fps    int
 
-	tex     []pixel.Picture
-	sprites []*pixel.Sprite
+	glcs []glc
+}
+
+type glc struct {
+	Pos    pixel.Vec
+	Tex    pixel.Picture
+	Sprite *pixel.Sprite
 }
 
 func New(c chassi.Chassi, width int, height int, fps int) Simulator {
@@ -36,7 +41,7 @@ func (s *Simulator) Start() {
 }
 
 func (s *Simulator) run() {
-	err := s.loadSprites(s.c.LineCards)
+	err := s.loadCardDefinitons(s.c.LineCards)
 	if err != nil {
 		panic(err)
 	}
@@ -56,7 +61,11 @@ func (s *Simulator) run() {
 	for !win.Closed() {
 
 		for i, _ := range s.c.LineCards {
-			s.sprites[i].Draw(win, pixel.IM.Moved(win.Bounds().Center()))
+			s.glcs[i].Sprite.Draw(win,
+				pixel.IM.Moved(
+					win.Bounds().Center().
+						Sub(pixel.V(432, 0)).
+						Add(s.glcs[i].Pos)))
 		}
 
 		win.Update()
@@ -65,18 +74,19 @@ func (s *Simulator) run() {
 
 }
 
-func (s *Simulator) loadSprites([]chassi.LineCard) error {
-	for _, lc := range s.c.LineCards {
+func (s *Simulator) loadCardDefinitons([]chassi.LineCard) error {
+	for i, lc := range s.c.LineCards {
+		newlc := glc{}
 		tex, err := loadPicture("assets/images/" + lc.Image)
 		if err != nil {
 			return err
 		}
-		s.tex = append(s.tex, tex)
-	}
 
-	for _, tex := range s.tex {
-		spr := pixel.NewSprite(tex, tex.Bounds())
-		s.sprites = append(s.sprites, spr)
+		newlc.Tex = tex
+		newlc.Sprite = pixel.NewSprite(tex, tex.Bounds())
+		newlc.Pos = pixel.V(108*float64(i), 0)
+
+		s.glcs = append(s.glcs, newlc)
 	}
 
 	return nil
