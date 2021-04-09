@@ -31,7 +31,7 @@ func getSliceAddr(slice []pixel.Pixel, s int, e int) []*pixel.Pixel {
 func getSliceMap(m []*pixel.Pixel, prefix string) map[string]*pixel.Pixel {
 	o := make(map[string]*pixel.Pixel)
 	for i, v := range m {
-		o[prefix+strconv.Itoa(i)] = v
+		o[prefix+strconv.Itoa(i+1)] = v
 	}
 	return o
 }
