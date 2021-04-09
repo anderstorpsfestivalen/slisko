@@ -14,6 +14,13 @@ func Gen6478() LineCard {
 
 		Status: &leds[0],
 		Link:   getSliceAddr(leds, 1, 49),
+		Labeled: map[string]*pixel.Pixel{
+			"status": &leds[0],
+		},
+	}
+
+	for k, v := range getSliceMap(getSliceAddr(leds, 1, 49), "p") {
+		l.Labeled[k] = v
 	}
 
 	setManyPixelPositons(l.LEDs, []pixel.Position{
@@ -86,7 +93,15 @@ func Gen6704() LineCard {
 
 		Status: &leds[0],
 		Link:   getSliceAddr(leds, 1, 5),
+		Labeled: map[string]*pixel.Pixel{
+			"status": &leds[0],
+		},
 	}
+
+	for k, v := range getSliceMap(getSliceAddr(leds, 1, 5), "p") {
+		l.Labeled[k] = v
+	}
+
 	setManyPixelPositons(l.LEDs, []pixel.Position{
 		{X: 27, Y: 55, Size: 8},
 
@@ -111,13 +126,18 @@ func GenSUP720() LineCard {
 
 		Status: &leds[0],
 		Link:   getSliceAddr(leds, 6, 9),
-		Misc: map[string]*pixel.Pixel{
+		Labeled: map[string]*pixel.Pixel{
+			"status": &leds[0],
 			"system": &leds[1],
 			"active": &leds[2],
 			"mgmt":   &leds[3],
 			"disk0":  &leds[4],
 			"disk1":  &leds[5],
 		},
+	}
+
+	for k, v := range getSliceMap(getSliceAddr(leds, 6, 9), "p") {
+		l.Labeled[k] = v
 	}
 
 	setManyPixelPositons(l.LEDs, []pixel.Position{

@@ -54,9 +54,9 @@ func (c *Chassi) getleds() []*pixel.Pixel {
 
 func (c *Chassi) GetCardOfType(ct string) []*LineCard {
 	t := []*LineCard{}
-	for _, lc := range c.LineCards {
+	for i, lc := range c.LineCards {
 		if lc.Name == ct {
-			t = append(t, &lc)
+			t = append(t, &c.LineCards[i])
 		}
 	}
 	return t
@@ -68,4 +68,14 @@ func (c *Chassi) GetCardOrder() []string {
 		st = append(st, lc.Name)
 	}
 	return st
+}
+
+func (c *Chassi) GetLEDWithLabel(label string) []*pixel.Pixel {
+	d := []*pixel.Pixel{}
+	for i, _ := range c.LineCards {
+		if val, ok := c.LineCards[i].Labeled[label]; ok {
+			d = append(d, val)
+		}
+	}
+	return d
 }

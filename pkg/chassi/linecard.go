@@ -1,6 +1,8 @@
 package chassi
 
 import (
+	"strconv"
+
 	"github.com/anderstorpsfestivalen/slisko/pkg/pixel"
 )
 
@@ -10,9 +12,9 @@ type LineCard struct {
 	Active bool
 	LEDs   []pixel.Pixel
 
-	Status *pixel.Pixel
-	Link   []*pixel.Pixel
-	Misc   map[string]*pixel.Pixel
+	Status  *pixel.Pixel
+	Link    []*pixel.Pixel
+	Labeled map[string]*pixel.Pixel
 }
 
 func getSliceAddr(slice []pixel.Pixel, s int, e int) []*pixel.Pixel {
@@ -24,6 +26,14 @@ func getSliceAddr(slice []pixel.Pixel, s int, e int) []*pixel.Pixel {
 		k++
 	}
 	return ym
+}
+
+func getSliceMap(m []*pixel.Pixel, prefix string) map[string]*pixel.Pixel {
+	o := make(map[string]*pixel.Pixel)
+	for i, v := range m {
+		o[prefix+strconv.Itoa(i)] = v
+	}
+	return o
 }
 
 func setManyPixelPositons(pixels []pixel.Pixel, p []pixel.Position) {
