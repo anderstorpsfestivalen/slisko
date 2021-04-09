@@ -1,14 +1,54 @@
 package main
 
 import (
-	"fmt"
+	"math"
+	"time"
 
 	"github.com/anderstorpsfestivalen/slisko/pkg/chassi"
+	"github.com/anderstorpsfestivalen/slisko/simulator"
+	log "github.com/sirupsen/logrus"
 )
 
 func main() {
-	d := chassi.Gen6704()
+	log.Info("Started Slisko Controller")
 
-	d.Link[1].G = 1.0
-	fmt.Println(d)
+	c := chassi.New([]chassi.LineCard{
+		chassi.Gen6478(),
+		chassi.Gen6704(),
+		chassi.GenBlank(),
+		chassi.Gen6704(),
+		chassi.GenSUP720(),
+		chassi.Gen6704(),
+		chassi.GenBlank(),
+		chassi.Gen6704(),
+		chassi.Gen6478(),
+	})
+
+	log.WithFields(log.Fields{
+		"linecards": c.GetCardOrder(),
+		"#":         len(c.LineCards),
+	}).Info("Created a new chassi")
+
+	painter(c)
+
+	sim := simulator.New(c, 1024, 768, 60)
+	sim.Start()
+
+}
+
+func painter(c chassi.Chassi) {
+	t := time.Now()
+	ticker := time.NewTicker((1000 / 60) * time.Millisecond)
+	go func() {
+		for {
+			_ = <-ticker.C
+
+			t := time.Since(t)
+
+			for _, p := range c.LinkPorts {
+				m := math.Sin(float64(t.Milliseconds()))
+				p.SetClamped(m, m, m)
+			}
+		}
+	}()
 }

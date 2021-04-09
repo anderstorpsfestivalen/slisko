@@ -5,9 +5,10 @@ import (
 )
 
 type LineCard struct {
-	Name  string
-	Image string
-	LEDs  []pixel.Pixel
+	Name   string
+	Image  string
+	Active bool
+	LEDs   []pixel.Pixel
 
 	Status *pixel.Pixel
 	Link   []*pixel.Pixel
