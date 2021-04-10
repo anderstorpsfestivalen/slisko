@@ -1,13 +1,21 @@
 package patterns
 
-import "github.com/anderstorpsfestivalen/slisko/pkg/chassi"
+import (
+	"time"
+
+	"github.com/anderstorpsfestivalen/slisko/pkg/chassi"
+)
 
 type PatternInfo struct {
 	Name     string
 	Category string
 }
 
+type RenderInfo struct {
+	Start time.Time
+}
+
 type Pattern interface {
-	Render(c *chassi.Chassi)
+	Render(info RenderInfo, c *chassi.Chassi)
 	Info() PatternInfo
 }

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/anderstorpsfestivalen/slisko/pkg/chassi"
@@ -9,6 +10,7 @@ import (
 	"github.com/gin-gonic/contrib/ginrus"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
 type API struct {
@@ -36,11 +38,52 @@ func (a *API) Start(listen string) {
 	logger.Level = logrus.WarnLevel
 	a.router.Use(ginrus.Ginrus(logger, time.RFC3339, true))
 
+	//Chassi
 	a.router.GET("/chassi", a.GetChassiConfiguration)
+
+	//Patterns
+	a.router.GET("/patterns", a.GetPatterns)
+	a.router.GET("/pattern/enable/:pattern", a.EnablePattern)
+	a.router.GET("/pattern/disable/:pattern", a.DisablePattern)
 
 	a.router.Run(listen)
 }
 
 func (a *API) GetChassiConfiguration(c *gin.Context) {
 	c.JSON(200, a.chassi.GetCardOrder())
+}
+
+func (a *API) GetPatterns(c *gin.Context) {
+	c.JSON(200, a.controller.ListPatterns())
+}
+
+func (a *API) EnablePattern(c *gin.Context) {
+	pattern := c.Param("pattern")
+	fmt.Println(pattern)
+	if !a.controller.PatternExists(pattern) {
+		log.WithField("pattern", pattern).Warn("Pattern does not exist")
+		c.JSON(404, gin.H{
+			"message": "Could not find pattern",
+		})
+		return
+	}
+
+	a.controller.EnablePattern(pattern)
+	c.JSON(202, gin.H{"status": "pattern enabled"})
+
+}
+
+func (a *API) DisablePattern(c *gin.Context) {
+	pattern := c.Param("pattern")
+	if !a.controller.PatternExists(pattern) {
+		log.WithField("pattern", pattern).Warn("Pattern does not exist")
+		c.JSON(404, gin.H{
+			"message": "Could not find pattern",
+		})
+		return
+	}
+
+	a.controller.DisablePattern(pattern)
+	c.JSON(202, gin.H{"status": "pattern disabled"})
+
 }

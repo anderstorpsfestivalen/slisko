@@ -1,15 +1,20 @@
 package patterns
 
 import (
+	"math"
+	"time"
+
 	"github.com/anderstorpsfestivalen/slisko/pkg/chassi"
+	"github.com/anderstorpsfestivalen/slisko/pkg/utils"
 )
 
 type BlinkPorts struct {
 }
 
-func (p *BlinkPorts) Render(c *chassi.Chassi) {
+func (p *BlinkPorts) Render(info RenderInfo, c *chassi.Chassi) {
+	v := utils.Square(math.Sin(20 * time.Since(info.Start).Seconds()))
 	for _, p := range c.LinkPorts {
-		p.SetClamped(1.0, 1.0, 0.3)
+		p.SetClamped(v, v, 0.0)
 	}
 
 }

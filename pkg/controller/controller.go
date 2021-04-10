@@ -9,19 +9,25 @@ import (
 )
 
 var pt = map[string]patterns.Pattern{
-	"blinkports": &patterns.BlinkPorts{},
+	"blinkports":  &patterns.BlinkPorts{},
+	"greenstatus": &patterns.GreenStatus{},
+	"redstatus":   &patterns.RedStatus{},
 }
 
 type Controller struct {
-	c         *chassi.Chassi
-	framerate int
+	c *chassi.Chassi
 
+	start time.Time
+
+	framerate      int
 	activePatterns []patterns.Pattern
 }
 
 func New(c *chassi.Chassi) Controller {
 	return Controller{
 		c: c,
+
+		start: time.Now(),
 	}
 }
 
@@ -38,6 +44,13 @@ func (ctrl *Controller) ListPatterns() []patterns.PatternInfo {
 	return d
 }
 
+func (ctrl *Controller) PatternExists(p string) bool {
+	if _, ok := pt[p]; ok {
+		return true
+	}
+	return false
+}
+
 func (ctrl *Controller) EnablePattern(p string) {
 
 	//Check if pattern is already enabled
@@ -46,9 +59,15 @@ func (ctrl *Controller) EnablePattern(p string) {
 			return
 		}
 	}
-
 	//Add pattern to render list
 	if pattern, ok := pt[p]; ok {
+		//Disable patterns in same category
+		for _, a := range ctrl.activePatterns {
+			if a.Info().Category == pattern.Info().Category {
+				ctrl.DisablePattern(a.Info().Name)
+			}
+		}
+
 		ctrl.activePatterns = append(ctrl.activePatterns, pattern)
 		log.Info("Activated pattern: " + pattern.Info().Name)
 	}
@@ -68,8 +87,11 @@ func (ctrl *Controller) render() {
 	ticker := time.NewTicker((1000 / time.Duration(ctrl.framerate)) * time.Millisecond)
 	for {
 		_ = <-ticker.C
+		info := patterns.RenderInfo{
+			Start: ctrl.start,
+		}
 		for _, p := range ctrl.activePatterns {
-			p.Render(ctrl.c)
+			p.Render(info, ctrl.c)
 		}
 	}
 }
