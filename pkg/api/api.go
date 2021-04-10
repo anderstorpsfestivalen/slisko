@@ -2,7 +2,6 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/anderstorpsfestivalen/slisko/pkg/chassi"
@@ -89,7 +88,6 @@ func (a *API) GetPatterns(c *gin.Context) {
 
 func (a *API) EnablePattern(c *gin.Context) {
 	pattern := c.Param("pattern")
-	fmt.Println(pattern)
 	if !a.controller.PatternExists(pattern) {
 		log.WithField("pattern", pattern).Warn("Pattern does not exist")
 		c.JSON(404, gin.H{

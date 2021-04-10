@@ -13,6 +13,7 @@ var pt = map[string]patterns.Pattern{
 	"greenstatus": &patterns.GreenStatus{},
 	"redstatus":   &patterns.RedStatus{},
 	"strobe":      &patterns.Strobe{},
+	"sup720":      &patterns.SUP720{},
 }
 
 type Controller struct {

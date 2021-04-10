@@ -39,6 +39,8 @@ func main() {
 	ctrl := controller.New(&c)
 	ctrl.Start(60)
 	ctrl.EnablePattern("blinkports")
+	ctrl.EnablePattern("greenstatus")
+	ctrl.EnablePattern("sup720")
 
 	api := api.New(&c, &ctrl)
 	go api.Start("0.0.0.0:3000")
