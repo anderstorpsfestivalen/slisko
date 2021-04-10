@@ -14,7 +14,7 @@ type BlinkPorts struct {
 func (p *BlinkPorts) Render(info RenderInfo, c *chassi.Chassi) {
 	v := utils.Square(math.Sin(20 * time.Since(info.Start).Seconds()))
 	for _, p := range c.LinkPorts {
-		p.SetClamped(v, v, 0.0)
+		p.SetClamped(v, v*0.7, 0.0)
 	}
 
 }
