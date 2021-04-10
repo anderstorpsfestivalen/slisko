@@ -1,30 +1,40 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/anderstorpsfestivalen/slisko/pkg/chassi"
 	"github.com/anderstorpsfestivalen/slisko/pkg/controller"
+	"github.com/gin-contrib/static"
 	"github.com/gin-gonic/contrib/cors"
 	"github.com/gin-gonic/contrib/ginrus"
 	"github.com/gin-gonic/gin"
+	"github.com/olahol/melody"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
 
 type API struct {
 	router *gin.Engine
+	m      *melody.Melody
 	port   int
 
 	chassi     *chassi.Chassi
 	controller *controller.Controller
 }
 
+type UpdateH struct {
+	Message string
+	Data    []string
+}
+
 func New(ch *chassi.Chassi, co *controller.Controller) API {
 	return API{
 		chassi:     ch,
 		controller: co,
+		m:          melody.New(),
 	}
 }
 
@@ -37,6 +47,26 @@ func (a *API) Start(listen string) {
 	logger := logrus.New()
 	logger.Level = logrus.WarnLevel
 	a.router.Use(ginrus.Ginrus(logger, time.RFC3339, true))
+	a.router.Use(static.Serve("/", static.LocalFile("ui/dist", false)))
+
+	//Websocket
+	a.router.GET("/ws", func(c *gin.Context) {
+		a.m.HandleRequest(c.Writer, c.Request)
+	})
+
+	go func() {
+		for {
+			msg := <-a.controller.Updates
+			b, _ := json.Marshal(msg)
+			a.m.Broadcast(b)
+		}
+	}()
+
+	a.m.HandleConnect(func(s *melody.Session) {
+		data := a.controller.GetPatternPerCategory()
+		b, _ := json.Marshal(data)
+		s.Write(b)
+	})
 
 	//Chassi
 	a.router.GET("/chassi", a.GetChassiConfiguration)

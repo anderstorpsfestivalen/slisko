@@ -20,6 +20,7 @@ type Controller struct {
 	start time.Time
 
 	framerate      int
+	Updates        chan map[string][]TP
 	activePatterns []patterns.Pattern
 }
 
@@ -27,7 +28,8 @@ func New(c *chassi.Chassi) Controller {
 	return Controller{
 		c: c,
 
-		start: time.Now(),
+		start:   time.Now(),
+		Updates: make(chan map[string][]TP, 20),
 	}
 }
 
@@ -42,6 +44,25 @@ func (ctrl *Controller) ListPatterns() []patterns.PatternInfo {
 		d = append(d, p.Info())
 	}
 	return d
+}
+
+type TP struct {
+	PatternName string
+	Category    string
+	Enabled     bool
+}
+
+func (ctrl *Controller) GetPatternPerCategory() map[string][]TP {
+	m := make(map[string][]TP)
+	for _, p := range pt {
+		enabled := ctrl.CheckIfActive(p.Info().Name)
+		m[p.Info().Category] = append(m[p.Info().Category], TP{
+			PatternName: p.Info().Name,
+			Category:    p.Info().Category,
+			Enabled:     enabled,
+		})
+	}
+	return m
 }
 
 func (ctrl *Controller) PatternExists(p string) bool {
@@ -62,15 +83,17 @@ func (ctrl *Controller) EnablePattern(p string) {
 	//Add pattern to render list
 	if pattern, ok := pt[p]; ok {
 		//Disable patterns in same category
-		for _, a := range ctrl.activePatterns {
+		for i, a := range ctrl.activePatterns {
 			if a.Info().Category == pattern.Info().Category {
-				ctrl.DisablePattern(a.Info().Name)
+				ctrl.activePatterns = remove(ctrl.activePatterns, i)
 			}
 		}
 
 		ctrl.activePatterns = append(ctrl.activePatterns, pattern)
 		log.Info("Activated pattern: " + pattern.Info().Name)
 	}
+
+	ctrl.Updates <- ctrl.GetPatternPerCategory()
 }
 
 func (ctrl *Controller) DisablePattern(p string) {
@@ -81,6 +104,16 @@ func (ctrl *Controller) DisablePattern(p string) {
 			return
 		}
 	}
+	ctrl.Updates <- ctrl.GetPatternPerCategory()
+}
+
+func (ctrl *Controller) CheckIfActive(p string) bool {
+	for _, a := range ctrl.activePatterns {
+		if a.Info().Name == p {
+			return true
+		}
+	}
+	return false
 }
 
 func (ctrl *Controller) render() {
