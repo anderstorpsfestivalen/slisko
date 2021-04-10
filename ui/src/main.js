@@ -1,12 +1,13 @@
 import Vue from "vue";
 import App from "./App.vue";
-import { BootstrapVue, BootstrapVueIcons } from "bootstrap-vue";
-import "bootstrap/dist/css/bootstrap.css";
-import "bootstrap-vue/dist/bootstrap-vue.css";
+import Buefy from "buefy";
+import "buefy/dist/buefy.css";
+
+Vue.use(Buefy);
 
 Vue.config.productionTip = false;
 
-var hostname = "ws://" + window.location.hostname + "/ws";
+var hostname = "ws://" + location.host + "/ws";
 
 if (window.webpackHotUpdate) {
 	hostname = "ws://" + window.location.hostname + ":3000/ws";
@@ -19,9 +20,6 @@ Vue.use(VueNativeSock, hostname, {
 	reconnectionAttempts: 50,
 	reconnectionDelay: 3000,
 });
-
-Vue.use(BootstrapVue);
-Vue.use(BootstrapVueIcons);
 
 new Vue({
 	render: (h) => h(App),

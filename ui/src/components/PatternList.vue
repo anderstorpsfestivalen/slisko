@@ -1,22 +1,49 @@
 <template>
 	<div class="container">
-		<div class="row">
-			<div class="col-sm">
-				One of three columns
+		<div class="columns">
+			<div class="column">
+				<h2>Ports</h2>
+				<PatternToggle
+					v-for="pattern in patterns.link"
+					:key="pattern.PatternName"
+					:enabled="pattern.Enabled"
+					:name="pattern.PatternName"
+				></PatternToggle>
 			</div>
-			<div class="col-sm">
-				One of three columns
+			<div class="column">
+				<h2>Status</h2>
+				<PatternToggle
+					v-for="pattern in patterns.status"
+					:key="pattern.PatternName"
+					:enabled="pattern.Enabled"
+					:name="pattern.PatternName"
+				></PatternToggle>
 			</div>
-			<div class="col-sm">
-				<PatternToggle :enabled="false"></PatternToggle>
+			<div class="column">
+				<h2>Misc</h2>
+				<PatternToggle
+					v-for="pattern in patterns.misc"
+					:key="pattern.PatternName"
+					:enabled="pattern.Enabled"
+					:name="pattern.PatternName"
+				></PatternToggle>
 			</div>
-			{{ patterns.link }}
+			<div class="column">
+				<h2>Global</h2>
+				<PatternToggle
+					v-for="pattern in patterns.global"
+					:key="pattern.PatternName"
+					:enabled="pattern.Enabled"
+					:name="pattern.PatternName"
+				></PatternToggle>
+			</div>
 		</div>
 	</div>
 </template>
 
 <script>
 import PatternToggle from "./PatternToggle";
+import _ from "lodash";
 export default {
 	name: "PatternList",
 	props: {},
@@ -28,8 +55,13 @@ export default {
 	components: { PatternToggle },
 	mounted: function() {},
 	created: function() {
-		this.$options.sockets.onmessage = (data) =>
-			(this.patterns = JSON.parse(data.data));
+		this.$options.sockets.onmessage = (data) => {
+			let m = JSON.parse(data.data);
+			for (const [key, value] of Object.entries(m)) {
+				m[key] = _.sortBy(value, ["PatternName"]);
+			}
+			this.patterns = m;
+		};
 	},
 };
 </script>

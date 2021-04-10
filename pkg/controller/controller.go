@@ -12,6 +12,7 @@ var pt = map[string]patterns.Pattern{
 	"blinkports":  &patterns.BlinkPorts{},
 	"greenstatus": &patterns.GreenStatus{},
 	"redstatus":   &patterns.RedStatus{},
+	"strobe":      &patterns.Strobe{},
 }
 
 type Controller struct {
@@ -100,6 +101,9 @@ func (ctrl *Controller) DisablePattern(p string) {
 	for i, a := range ctrl.activePatterns {
 		if a.Info().Name == p {
 			ctrl.activePatterns = remove(ctrl.activePatterns, i)
+			for _, l := range ctrl.c.LEDs {
+				l.SetColor(0.0, 0.0, 0.0)
+			}
 			log.Info("Disabled pattern: " + a.Info().Name)
 			return
 		}
@@ -122,6 +126,12 @@ func (ctrl *Controller) render() {
 		_ = <-ticker.C
 		info := patterns.RenderInfo{
 			Start: ctrl.start,
+		}
+		for _, p := range ctrl.activePatterns {
+			if p.Info().Category == "global" {
+				p.Render(info, ctrl.c)
+				continue
+			}
 		}
 		for _, p := range ctrl.activePatterns {
 			p.Render(info, ctrl.c)
