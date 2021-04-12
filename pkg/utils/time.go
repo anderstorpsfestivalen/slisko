@@ -24,3 +24,7 @@ func Cos(t time.Time, speed float64) float64 {
 func Triangle(t time.Time, period float64, amplitude float64) float64 {
 	return math.Abs(math.Mod(time.Since(t).Seconds(), period) - amplitude)
 }
+
+func CurlyTriangle(t time.Time, period float64, amplitude float64, curl float64) float64 {
+	return math.Pow(math.Abs(math.Mod(time.Since(t).Seconds(), period)-amplitude), curl)
+}
