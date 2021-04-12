@@ -20,3 +20,7 @@ func Sin(t time.Time, speed float64) float64 {
 func Cos(t time.Time, speed float64) float64 {
 	return (math.Cos(speed*time.Since(t).Seconds()) + 1) / 2
 }
+
+func Triangle(t time.Time, period float64, amplitude float64) float64 {
+	return math.Abs(math.Mod(time.Since(t).Seconds(), period) - amplitude)
+}
