@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 
+	"github.com/anderstorpsfestivalen/slisko/pkg/apa102"
 	"github.com/anderstorpsfestivalen/slisko/pkg/api"
 	"github.com/anderstorpsfestivalen/slisko/pkg/chassi"
 	"github.com/anderstorpsfestivalen/slisko/pkg/controller"
@@ -12,6 +13,8 @@ import (
 
 func main() {
 	flag.Bool("simulator", false, "enables the simulator")
+	flag.Bool("ds", false, "disables SPI output")
+	fps := flag.Int("fps", 60, "override the FPS")
 	flag.Parse()
 
 	log.Info("Started Slisko Controller")
@@ -33,11 +36,8 @@ func main() {
 		"#":         len(c.LineCards),
 	}).Info("Created a new chassi")
 
-	// output := apa102.New(&c, 60)-
-	// output.Start()
-
 	ctrl := controller.New(&c)
-	ctrl.Start(60)
+	ctrl.Start(*fps)
 	ctrl.EnablePattern("blinkports")
 	ctrl.EnablePattern("greenstatus")
 	ctrl.EnablePattern("sup720")
@@ -45,12 +45,19 @@ func main() {
 	api := api.New(&c, &ctrl)
 	go api.Start("0.0.0.0:3000")
 
-	if isFlagPassed("simulator") {
-		sim := simulator.New(c, (108 * 9), 1000, 60)
-		sim.Start()
-	} else {
-		select {}
+	if !isFlagPassed("ds") {
+		apa, err := apa102.New("/dev/spidev0.0", 144, 8, ctrl.FrameBroker.Subscribe())
+		if err != nil {
+			log.Panic(err)
+		}
 	}
+
+	if isFlagPassed("simulator") {
+		sim := simulator.New(c, (108 * 9), 1000, ctrl.FrameBroker.Subscribe())
+		sim.Start()
+	}
+
+	select {}
 
 }
 

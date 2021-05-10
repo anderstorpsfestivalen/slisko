@@ -24,20 +24,24 @@ type Controller struct {
 	framerate      int
 	Updates        chan map[string][]TP
 	activePatterns []patterns.Pattern
+
+	FrameBroker *Broker
 }
 
 func New(c *chassi.Chassi) Controller {
 	return Controller{
 		c: c,
 
-		start:   time.Now(),
-		Updates: make(chan map[string][]TP, 20),
+		start:       time.Now(),
+		Updates:     make(chan map[string][]TP, 20),
+		FrameBroker: NewBroker(),
 	}
 }
 
 func (ctrl *Controller) Start(framerate int) {
 	ctrl.framerate = framerate
 	go ctrl.render()
+	go ctrl.FrameBroker.Start()
 }
 
 func (ctrl *Controller) ListPatterns() []patterns.PatternInfo {
@@ -137,6 +141,7 @@ func (ctrl *Controller) render() {
 		for _, p := range ctrl.activePatterns {
 			p.Render(info, ctrl.c)
 		}
+		ctrl.FrameBroker.Publish(true)
 	}
 }
 

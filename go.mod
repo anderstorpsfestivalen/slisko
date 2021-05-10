@@ -24,4 +24,7 @@ require (
 	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
 	gopkg.in/go-playground/validator.v8 v8.18.2 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
+	periph.io/x/conn/v3 v3.6.7 // indirect
+	periph.io/x/devices/v3 v3.6.9 // indirect
+	periph.io/x/host/v3 v3.6.7 // indirect
 )

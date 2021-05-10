@@ -3,7 +3,6 @@ package simulator
 import (
 	"image"
 	"os"
-	"time"
 
 	_ "image/png"
 
@@ -14,10 +13,11 @@ import (
 )
 
 type Simulator struct {
-	c      chassi.Chassi
-	width  int
-	height int
-	fps    int
+	c             chassi.Chassi
+	width         int
+	height        int
+	fps           int
+	renderTrigger chan bool
 
 	glcs []glc
 	LEDs []*imdraw.IMDraw
@@ -29,12 +29,13 @@ type glc struct {
 	Sprite *pixel.Sprite
 }
 
-func New(c chassi.Chassi, width int, height int, fps int) Simulator {
+func New(c chassi.Chassi, width int, height int, trigger chan bool) Simulator {
 	return Simulator{
 		c:      c,
 		width:  width,
 		height: height,
-		fps:    fps,
+
+		renderTrigger: trigger,
 	}
 }
 
@@ -58,8 +59,6 @@ func (s *Simulator) run() {
 		panic(err)
 	}
 
-	fps := time.Tick(time.Second / time.Duration(s.fps))
-
 	for !win.Closed() {
 
 		s.generateLEDs(win)
@@ -76,7 +75,7 @@ func (s *Simulator) run() {
 		}
 
 		win.Update()
-		<-fps
+		<-s.renderTrigger
 	}
 
 }
