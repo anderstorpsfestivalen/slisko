@@ -50,11 +50,16 @@ func main() {
 		if err != nil {
 			log.Panic(err)
 		}
+
+		//SUP720 + 1 blank
+		apa.Map(c.LineCards[4].LEDs)
+		apa.Map(apa102.GenEmpty(1))
+		go apa.Run()
 	}
 
 	if isFlagPassed("simulator") {
 		sim := simulator.New(c, (108 * 9), 1000, ctrl.FrameBroker.Subscribe())
-		sim.Start()
+		go sim.Start()
 	}
 
 	select {}

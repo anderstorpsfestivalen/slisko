@@ -53,3 +53,32 @@ func New(port string, numPixels int64, mhz int64, trigger chan bool) (*APA102, e
 		renderTrigger: trigger,
 	}, nil
 }
+
+func (a *APA102) Run() {
+	for {
+		<-a.renderTrigger
+		var op = []byte{}
+		for _, l := range a.mapping {
+			op = append(op, []byte{
+				pixel.Clamp255(l.R * 255),
+				pixel.Clamp255(l.G * 255),
+				pixel.Clamp255(l.B * 255),
+			}...)
+		}
+	}
+}
+
+func (a *APA102) Map(nm []pixel.Pixel) {
+	for z, _ := range nm {
+		a.mapping = append(a.mapping, &nm[z])
+	}
+}
+
+func GenEmpty(num int) []pixel.Pixel {
+	lp := []pixel.Pixel{}
+
+	for i := 0; i < num; i++ {
+		lp = append(lp, pixel.Pixel{})
+	}
+	return lp
+}
