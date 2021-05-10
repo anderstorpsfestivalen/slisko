@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 
 	"github.com/anderstorpsfestivalen/slisko/pkg/apa102"
 	"github.com/anderstorpsfestivalen/slisko/pkg/api"
@@ -46,9 +47,11 @@ func main() {
 	go api.Start("0.0.0.0:3000")
 
 	if !isFlagPassed("ds") {
+		fmt.Println("running")
 		apa, err := apa102.New("/dev/spidev0.0", 144, 8, ctrl.FrameBroker.Subscribe())
 		if err != nil {
-			log.Panic(err)
+			log.Error(err)
+			log.Error("SPI FAILED TO INITALIZE, THE LED STRIP WILL NOT WORK")
 		}
 
 		//SUP720 + 1 blank
@@ -59,10 +62,10 @@ func main() {
 
 	if isFlagPassed("simulator") {
 		sim := simulator.New(c, (108 * 9), 1000, ctrl.FrameBroker.Subscribe())
-		go sim.Start()
+		sim.Start()
+	} else {
+		select {}
 	}
-
-	select {}
 
 }
 

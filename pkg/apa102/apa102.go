@@ -22,12 +22,12 @@ type APA102 struct {
 
 func New(port string, numPixels int64, mhz int64, trigger chan bool) (*APA102, error) {
 	if _, err := host.Init(); err != nil {
-		return nil, err
+		return &APA102{renderTrigger: trigger}, err
 	}
 
 	s1, err := spireg.Open(port)
 	if err != nil {
-		return nil, err
+		return &APA102{renderTrigger: trigger}, err
 	}
 
 	dd := physic.MegaHertz
@@ -44,7 +44,7 @@ func New(port string, numPixels int64, mhz int64, trigger chan bool) (*APA102, e
 	opts.NumPixels = int(numPixels)
 	strip, err := apa102.New(s1, &opts)
 	if err != nil {
-		return nil, err
+		return &APA102{renderTrigger: trigger}, err
 	}
 
 	return &APA102{
