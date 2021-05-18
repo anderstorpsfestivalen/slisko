@@ -15,6 +15,7 @@ import (
 func main() {
 	flag.Bool("simulator", false, "enables the simulator")
 	flag.Bool("ds", false, "disables SPI output")
+	brightness := flag.Uint("brightness", 255, "override global brightness")
 	fps := flag.Int("fps", 60, "override the FPS")
 	flag.Parse()
 
@@ -48,7 +49,11 @@ func main() {
 
 	if !isFlagPassed("ds") {
 		fmt.Println("running")
-		apa, err := apa102.New("/dev/spidev0.0", 144, 8, ctrl.FrameBroker.Subscribe())
+		apa, err := apa102.New("/dev/spidev0.0",
+			144,                // NUM LEDS
+			uint8(*brightness), //BRIGHTNESS
+			8,                  // MHZ (not used rihgt now hahahaha)
+			ctrl.FrameBroker.Subscribe())
 		if err != nil {
 			log.Error(err)
 			log.Error("SPI FAILED TO INITALIZE, THE LED STRIP WILL NOT WORK")

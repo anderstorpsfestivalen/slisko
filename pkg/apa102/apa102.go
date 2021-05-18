@@ -21,14 +21,14 @@ type APA102 struct {
 	initated bool
 }
 
-func New(port string, numPixels int64, mhz int64, trigger chan bool) (*APA102, error) {
+func New(port string, numPixels int64, brightness uint8, mhz int64, trigger chan bool) (*APA102, error) {
 	if _, err := host.Init(); err != nil {
-		return &APA102{renderTrigger: trigger}, err
+		return &APA102{renderTrigger: trigger, outputBuf: make([]byte, numPixels*3)}, err
 	}
 
 	s1, err := spireg.Open(port)
 	if err != nil {
-		return &APA102{renderTrigger: trigger}, err
+		return &APA102{renderTrigger: trigger, outputBuf: make([]byte, numPixels*3)}, err
 	}
 
 	if p, ok := s1.(spi.Pins); ok {
@@ -40,10 +40,10 @@ func New(port string, numPixels int64, mhz int64, trigger chan bool) (*APA102, e
 
 	opts := apa102.DefaultOpts
 	opts.NumPixels = int(numPixels)
-	opts.Intensity = 10
+	opts.Intensity = brightness
 	strip, err := apa102.New(s1, &opts)
 	if err != nil {
-		return &APA102{renderTrigger: trigger}, err
+		return &APA102{renderTrigger: trigger, outputBuf: make([]byte, numPixels*3)}, err
 	}
 
 	return &APA102{
