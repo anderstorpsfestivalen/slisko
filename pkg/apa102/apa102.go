@@ -1,6 +1,7 @@
 package apa102
 
 import (
+	"fmt"
 	"strconv"
 
 	log "github.com/sirupsen/logrus"
@@ -18,6 +19,8 @@ type APA102 struct {
 	strip         *apa102.Dev
 	mapping       []*pixel.Pixel
 	renderTrigger chan bool
+
+	initated bool
 }
 
 func New(port string, numPixels int64, mhz int64, trigger chan bool) (*APA102, error) {
@@ -31,7 +34,7 @@ func New(port string, numPixels int64, mhz int64, trigger chan bool) (*APA102, e
 	}
 
 	dd := physic.MegaHertz
-	dd.Set(strconv.FormatInt(mhz, 10) + "MHz")
+	dd.Set(strconv.FormatInt(mhz, 6) + "MHz")
 	s1.LimitSpeed(dd)
 	if p, ok := s1.(spi.Pins); ok {
 		log.WithFields(log.Fields{
@@ -42,6 +45,7 @@ func New(port string, numPixels int64, mhz int64, trigger chan bool) (*APA102, e
 
 	opts := apa102.DefaultOpts
 	opts.NumPixels = int(numPixels)
+	opts.Intensity = 10
 	strip, err := apa102.New(s1, &opts)
 	if err != nil {
 		return &APA102{renderTrigger: trigger}, err
@@ -51,6 +55,7 @@ func New(port string, numPixels int64, mhz int64, trigger chan bool) (*APA102, e
 		port:          s1,
 		strip:         strip,
 		renderTrigger: trigger,
+		initated:      true,
 	}, nil
 }
 
@@ -59,14 +64,17 @@ func (a *APA102) Run() {
 		<-a.renderTrigger
 		var op = []byte{}
 		for _, l := range a.mapping {
+			fmt.Println(l)
 			op = append(op, []byte{
-				pixel.Clamp255(l.B * 255),
-				pixel.Clamp255(l.G * 255),
 				pixel.Clamp255(l.R * 255),
+				pixel.Clamp255(l.G * 255),
+				pixel.Clamp255(l.B * 255),
 			}...)
 		}
 
-		a.strip.Write(op)
+		if a.initated {
+			a.strip.Write(op)
+		}
 	}
 }
 
