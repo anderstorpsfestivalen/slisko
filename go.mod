@@ -26,5 +26,6 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	periph.io/x/conn/v3 v3.6.7 // indirect
 	periph.io/x/devices/v3 v3.6.9 // indirect
+	periph.io/x/extra v0.0.0-20200225150845-c5a4b83ade91 // indirect
 	periph.io/x/host/v3 v3.6.7 // indirect
 )

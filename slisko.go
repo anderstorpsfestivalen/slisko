@@ -2,11 +2,11 @@ package main
 
 import (
 	"flag"
-	"fmt"
 
 	"github.com/anderstorpsfestivalen/slisko/pkg/apa102"
 	"github.com/anderstorpsfestivalen/slisko/pkg/api"
 	"github.com/anderstorpsfestivalen/slisko/pkg/chassi"
+	"github.com/anderstorpsfestivalen/slisko/pkg/console"
 	"github.com/anderstorpsfestivalen/slisko/pkg/controller"
 	"github.com/anderstorpsfestivalen/slisko/simulator"
 	log "github.com/sirupsen/logrus"
@@ -14,7 +14,7 @@ import (
 
 func main() {
 	flag.Bool("simulator", false, "enables the simulator")
-	flag.Bool("ds", false, "disables SPI output")
+	flag.Bool("console", false, "Enables LED console output")
 	brightness := flag.Uint("brightness", 255, "override global brightness")
 	fps := flag.Int("fps", 60, "override the FPS")
 	flag.Parse()
@@ -47,22 +47,26 @@ func main() {
 	api := api.New(&c, &ctrl)
 	go api.Start("0.0.0.0:3000")
 
-	if !isFlagPassed("ds") {
-		fmt.Println("running")
-		apa, err := apa102.New("/dev/spidev0.0",
-			144,                // NUM LEDS
-			uint8(*brightness), //BRIGHTNESS
-			8,                  // MHZ (not used rihgt now hahahaha)
-			ctrl.FrameBroker.Subscribe())
-		if err != nil {
-			log.Error(err)
-			log.Error("SPI FAILED TO INITALIZE, THE LED STRIP WILL NOT WORK")
-		}
+	//APA102 DEFINITION
 
-		//SUP720 + 1 blank
-		apa.Map(c.LineCards[4].LEDs)
-		apa.Map(apa102.GenEmpty(1))
-		go apa.Run()
+	apa, err := apa102.New("/dev/spidev0.0",
+		144,                // NUM LEDS
+		uint8(*brightness), //BRIGHTNESS
+		8,                  // MHZ (not used rihgt now hahahaha)
+		ctrl.FrameBroker.Subscribe())
+	if err != nil {
+		log.Error(err)
+		log.Error("SPI FAILED TO INITALIZE, THE LED STRIP WILL NOT WORK")
+	}
+
+	//SUP720 + 1 blank
+	apa.Map(c.LineCards[4].LEDs)
+	apa.Map(apa102.GenEmpty(1))
+	go apa.Run()
+
+	if isFlagPassed("console") {
+		console := console.New(apa.GetMap(), ctrl.FrameBroker.Subscribe())
+		go console.Run()
 	}
 
 	if isFlagPassed("simulator") {

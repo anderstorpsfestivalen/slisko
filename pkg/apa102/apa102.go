@@ -76,6 +76,10 @@ func (a *APA102) Map(nm []pixel.Pixel) {
 	}
 }
 
+func (a *APA102) GetMap() *[]*pixel.Pixel {
+	return &a.mapping
+}
+
 func GenEmpty(num int) []pixel.Pixel {
 	lp := []pixel.Pixel{}
 
