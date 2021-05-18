@@ -60,9 +60,9 @@ func (a *APA102) Run() {
 		var op = []byte{}
 		for _, l := range a.mapping {
 			op = append(op, []byte{
-				pixel.Clamp255(l.R * 255),
-				pixel.Clamp255(l.G * 255),
 				pixel.Clamp255(l.B * 255),
+				pixel.Clamp255(l.G * 255),
+				pixel.Clamp255(l.R * 255),
 			}...)
 		}
 
