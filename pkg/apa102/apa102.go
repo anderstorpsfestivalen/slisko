@@ -65,6 +65,8 @@ func (a *APA102) Run() {
 				pixel.Clamp255(l.B * 255),
 			}...)
 		}
+
+		a.strip.Write(op)
 	}
 }
 
