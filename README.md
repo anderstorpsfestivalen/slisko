@@ -5,6 +5,7 @@
 To run on Linux, install the following packages: libgl1-mesa-dev xorg-dev libglfw-dev
 
 **Architecture**
+```
                         ┌───────────────────────────────────┐                                                   
                         │        ┌──────────────────────────┼───┐   ┌───────────────────────────────┐           
                         │        │ Simulator                │   │   │ APA102                        │           
@@ -62,3 +63,4 @@ To run on Linux, install the following packages: libgl1-mesa-dev xorg-dev libglf
                                                             │    B f64            │                             
                                                             │    pos (X, Y, Size) │                             
                                                             └─────────────────────┘                             
+```
