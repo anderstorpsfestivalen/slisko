@@ -10,7 +10,7 @@ import (
 )
 
 type SUP720 struct {
-	disk1 *faker.Blinker
+	disk1 *faker.IntervalBlinker
 }
 
 func (p *SUP720) Render(info RenderInfo, c *chassi.Chassi) {
@@ -39,5 +39,5 @@ func (p *SUP720) Info() PatternInfo {
 }
 
 func (p *SUP720) Bootstrap() {
-	p.disk1 = faker.NewBlinker()
+	p.disk1 = faker.NewIntervalBlinker(2*time.Second, 500*time.Millisecond, 30)
 }
