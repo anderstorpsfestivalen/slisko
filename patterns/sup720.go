@@ -5,12 +5,12 @@ import (
 	"time"
 
 	"github.com/anderstorpsfestivalen/slisko/pkg/chassi"
-	"github.com/anderstorpsfestivalen/slisko/pkg/portlike"
+	"github.com/anderstorpsfestivalen/slisko/pkg/faker"
 	"github.com/anderstorpsfestivalen/slisko/pkg/utils"
 )
 
 type SUP720 struct {
-	disk1 *portlike.Blinker
+	disk1 *faker.Blinker
 }
 
 func (p *SUP720) Render(info RenderInfo, c *chassi.Chassi) {
@@ -39,5 +39,5 @@ func (p *SUP720) Info() PatternInfo {
 }
 
 func (p *SUP720) Bootstrap() {
-	p.disk1 = portlike.NewBlinker()
+	p.disk1 = faker.NewBlinker()
 }

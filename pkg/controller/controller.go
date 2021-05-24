@@ -103,7 +103,9 @@ func (ctrl *Controller) EnablePattern(p string) {
 		//Disable patterns in same category
 		for i, a := range ctrl.activePatterns {
 			if a.Info().Category == pattern.Info().Category {
-				ctrl.activePatterns = remove(ctrl.activePatterns, i)
+				if a.Info().Category != "misc" {
+					ctrl.activePatterns = remove(ctrl.activePatterns, i)
+				}
 			}
 		}
 

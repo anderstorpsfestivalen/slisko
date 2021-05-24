@@ -1,4 +1,4 @@
-package portlike
+package faker
 
 import (
 	"math"
