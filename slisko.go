@@ -46,6 +46,7 @@ func main() {
 	ctrl.EnablePattern("blinkports")
 	ctrl.EnablePattern("greenstatus")
 	ctrl.EnablePattern("sup720")
+	ctrl.EnablePattern("x6704")
 
 	api := api.New(&c, &ctrl)
 	go api.Start("0.0.0.0:3000")
@@ -53,7 +54,7 @@ func main() {
 	//APA102 DEFINITION
 
 	apa, err := apa102.New("/dev/spidev0.0",
-		144,                // NUM LEDS
+		6,                  // NUM LEDS
 		uint8(*brightness), //BRIGHTNESS
 		8,                  // MHZ (not used rihgt now hahahaha)
 		ctrl.FrameBroker.Subscribe())
@@ -74,7 +75,7 @@ func main() {
 	}
 
 	//SUP720 + 1 blank
-	apa.Map(c.LineCards[4].LEDs)
+	apa.Map(c.LineCards[3].LEDs)
 	apa.Map(apa102.GenEmpty(1))
 	go apa.Run()
 
