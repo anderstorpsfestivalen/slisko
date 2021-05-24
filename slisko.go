@@ -46,6 +46,7 @@ func main() {
 	ctrl.EnablePattern("blinkports")
 	ctrl.EnablePattern("greenstatus")
 	ctrl.EnablePattern("sup720")
+	ctrl.EnablePattern("x6704")
 
 	api := api.New(&c, &ctrl)
 	go api.Start("0.0.0.0:3000")
@@ -73,8 +74,8 @@ func main() {
 		}()
 	}
 
-	//SUP720 + 1 blank
-	apa.Map(c.LineCards[4].LEDs)
+	//Generate a test 6704 + 1 blank
+	apa.Map(c.LineCards[3].LEDs)
 	apa.Map(apa102.GenEmpty(1))
 	go apa.Run()
 
