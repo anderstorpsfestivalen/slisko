@@ -31,3 +31,6 @@ func (p *X6704) Info() PatternInfo {
 		Category: "misc",
 	}
 }
+
+func (p *X6704) Bootstrap() {
+}
