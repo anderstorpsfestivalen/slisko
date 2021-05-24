@@ -54,7 +54,7 @@ func main() {
 	//APA102 DEFINITION
 
 	apa, err := apa102.New("/dev/spidev0.0",
-		6,                  // NUM LEDS
+		144,                // NUM LEDS
 		uint8(*brightness), //BRIGHTNESS
 		8,                  // MHZ (not used rihgt now hahahaha)
 		ctrl.FrameBroker.Subscribe())
@@ -74,7 +74,7 @@ func main() {
 		}()
 	}
 
-	//SUP720 + 1 blank
+	//Generate a test 6704 + 1 blank
 	apa.Map(c.LineCards[3].LEDs)
 	apa.Map(apa102.GenEmpty(1))
 	go apa.Run()
