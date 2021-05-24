@@ -19,7 +19,8 @@ var pt = map[string]patterns.Pattern{
 type Controller struct {
 	c *chassi.Chassi
 
-	start time.Time
+	start  time.Time
+	ticker *time.Ticker
 
 	framerate      int
 	Updates        chan map[string][]TP
@@ -42,6 +43,10 @@ func (ctrl *Controller) Start(framerate int) {
 	ctrl.framerate = framerate
 	go ctrl.render()
 	go ctrl.FrameBroker.Start()
+}
+
+func (ctrl *Controller) Stop() {
+	ctrl.ticker.Stop()
 }
 
 func (ctrl *Controller) ListPatterns() []patterns.PatternInfo {
@@ -126,9 +131,9 @@ func (ctrl *Controller) CheckIfActive(p string) bool {
 }
 
 func (ctrl *Controller) render() {
-	ticker := time.NewTicker((1000 / time.Duration(ctrl.framerate)) * time.Millisecond)
+	ctrl.ticker = time.NewTicker((1000 / time.Duration(ctrl.framerate)) * time.Millisecond)
 	for {
-		_ = <-ticker.C
+		_ = <-ctrl.ticker.C
 		info := patterns.RenderInfo{
 			Start: ctrl.start,
 		}

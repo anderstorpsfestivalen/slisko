@@ -88,3 +88,16 @@ func GenEmpty(num int) []pixel.Pixel {
 	}
 	return lp
 }
+
+func (a *APA102) Clear() {
+	for i, _ := range a.outputBuf {
+		a.outputBuf[i] = 0
+	}
+	if a.initated {
+		a.strip.Write(a.outputBuf)
+	}
+}
+
+func (a *APA102) Close() {
+	a.port.Close()
+}
