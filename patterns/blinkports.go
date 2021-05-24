@@ -25,3 +25,7 @@ func (p *BlinkPorts) Info() PatternInfo {
 		Category: "link",
 	}
 }
+
+func (p *BlinkPorts) Bootstrap() {
+
+}

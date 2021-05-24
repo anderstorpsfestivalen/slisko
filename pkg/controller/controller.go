@@ -30,6 +30,12 @@ type Controller struct {
 }
 
 func New(c *chassi.Chassi) Controller {
+
+	//Create patterns
+	for _, p := range pt {
+		p.Bootstrap()
+	}
+
 	return Controller{
 		c: c,
 

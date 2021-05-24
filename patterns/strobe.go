@@ -25,3 +25,7 @@ func (p *Strobe) Info() PatternInfo {
 		Category: "global",
 	}
 }
+
+func (p *Strobe) Bootstrap() {
+
+}

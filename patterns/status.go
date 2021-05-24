@@ -20,6 +20,10 @@ func (p *GreenStatus) Info() PatternInfo {
 	}
 }
 
+func (p *GreenStatus) Bootstrap() {
+
+}
+
 type RedStatus struct {
 }
 
@@ -34,4 +38,8 @@ func (p *RedStatus) Info() PatternInfo {
 		Name:     "redstatus",
 		Category: "status",
 	}
+}
+
+func (p *RedStatus) Bootstrap() {
+
 }
