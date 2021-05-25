@@ -43,7 +43,7 @@ func main() {
 
 	ctrl := controller.New(&c)
 	ctrl.Start(*fps)
-	ctrl.EnablePattern("blinkports")
+	ctrl.EnablePattern("blink48ports")
 	ctrl.EnablePattern("greenstatus")
 	ctrl.EnablePattern("sup720")
 	ctrl.EnablePattern("x6704")

@@ -21,7 +21,7 @@ func (p *BlinkPorts) Render(info RenderInfo, c *chassi.Chassi) {
 
 func (p *BlinkPorts) Info() PatternInfo {
 	return PatternInfo{
-		Name:     "blinkports",
+		Name:     "blink48ports",
 		Category: "link",
 	}
 }
