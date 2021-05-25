@@ -15,6 +15,7 @@ var pt = map[string]patterns.Pattern{
 	"strobe":       &patterns.Strobe{},
 	"sup720":       &patterns.SUP720{},
 	"x6704":        &patterns.X6704{},
+	"colorcycler":  &patterns.Colorcycler{},
 }
 
 type Controller struct {

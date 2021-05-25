@@ -49,6 +49,8 @@ github.com/json-iterator/go v1.1.10/go.mod h1:KdQUCv79m/52Kvf8AW2vK1V8akMuk1QjK/
 github.com/leodido/go-urn v1.2.0/go.mod h1:+8+nEpDfqqsY+g338gtMEUOtuK+4dEMhiQEgxpxOKII=
 github.com/leodido/go-urn v1.2.1 h1:BqpAaACuzVSgi/VLzGZIobT2z4v53pjosyNd9Yv6n/w=
 github.com/leodido/go-urn v1.2.1/go.mod h1:zt4jvISO2HfUBqxjfIshjdMTYS56ZS/qv49ictyFfxY=
+github.com/lucasb-eyer/go-colorful v1.2.0 h1:1nnpGOrhyZZuNyfu1QjKiUICQ74+3FNCN69Aj6K7nkY=
+github.com/lucasb-eyer/go-colorful v1.2.0/go.mod h1:R4dSotOR9KMtayYi1e77YzuveK+i7ruzyGqttikkLy0=
 github.com/maruel/ansi256 v1.0.0/go.mod h1:TRJwQ7LqnqgZq0zP9lRNEO9hlwgPbUy5JY6dc0d442k=
 github.com/maruel/ansi256 v1.0.2 h1:AE5gYrrZ5vQaFTTwy5vxva8Bak7p7wID3Uqu3t1j3No=
 github.com/maruel/ansi256 v1.0.2/go.mod h1:x7uow2KFkUgjdzvYHyfZuMEOTGKvCYLyVUHIVg1vYic=
