@@ -18,5 +18,5 @@ type RenderInfo struct {
 type Pattern interface {
 	Render(info RenderInfo, c *chassi.Chassi)
 	Info() PatternInfo
-	Bootstrap()
+	Bootstrap(c *chassi.Chassi)
 }

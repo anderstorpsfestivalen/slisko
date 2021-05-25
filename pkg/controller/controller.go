@@ -9,12 +9,12 @@ import (
 )
 
 var pt = map[string]patterns.Pattern{
-	"blinkports":  &patterns.BlinkPorts{},
-	"greenstatus": &patterns.GreenStatus{},
-	"redstatus":   &patterns.RedStatus{},
-	"strobe":      &patterns.Strobe{},
-	"sup720":      &patterns.SUP720{},
-	"x6704":       &patterns.X6704{},
+	"blink48ports": &patterns.Blink48Ports{},
+	"greenstatus":  &patterns.GreenStatus{},
+	"redstatus":    &patterns.RedStatus{},
+	"strobe":       &patterns.Strobe{},
+	"sup720":       &patterns.SUP720{},
+	"x6704":        &patterns.X6704{},
 }
 
 type Controller struct {
@@ -34,7 +34,7 @@ func New(c *chassi.Chassi) Controller {
 
 	//Create patterns
 	for _, p := range pt {
-		p.Bootstrap()
+		p.Bootstrap(c)
 	}
 
 	return Controller{

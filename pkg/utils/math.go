@@ -1,6 +1,8 @@
 package utils
 
-import "math/rand"
+import (
+	"math/rand"
+)
 
 func Crush(v float64, threshold float64) float64 {
 	if v > threshold {
@@ -28,6 +30,10 @@ func Trigger(v float64, trigger bool) float64 {
 
 func Random(min float64, max float64) float64 {
 	return min + rand.Float64()*(max-min)
+}
+
+func RandomInt64(min int64, max int64) int64 {
+	return rand.Int63n(max-min) + min
 }
 
 func Square(v float64) float64 {

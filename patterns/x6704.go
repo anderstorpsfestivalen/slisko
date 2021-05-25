@@ -32,4 +32,4 @@ func (p *X6704) Info() PatternInfo {
 	}
 }
 
-func (p *X6704) Bootstrap() {}
+func (p *X6704) Bootstrap(c *chassi.Chassi) {}

@@ -20,7 +20,7 @@ func (p *GreenStatus) Info() PatternInfo {
 	}
 }
 
-func (p *GreenStatus) Bootstrap() {
+func (p *GreenStatus) Bootstrap(c *chassi.Chassi) {
 
 }
 
@@ -40,6 +40,6 @@ func (p *RedStatus) Info() PatternInfo {
 	}
 }
 
-func (p *RedStatus) Bootstrap() {
+func (p *RedStatus) Bootstrap(c *chassi.Chassi) {
 
 }

@@ -26,6 +26,6 @@ func (p *Strobe) Info() PatternInfo {
 	}
 }
 
-func (p *Strobe) Bootstrap() {
+func (p *Strobe) Bootstrap(c *chassi.Chassi) {
 
 }
