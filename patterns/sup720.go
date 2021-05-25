@@ -39,7 +39,8 @@ func (p *SUP720) Info() PatternInfo {
 }
 
 func (p *SUP720) Bootstrap() {
-	p.disk0 = faker.NewRandomInterval(400, 6000, 100, 3500, faker.NewBlinker(25))
+	p.disk0 = faker.NewRandomInterval(400, 6000, 100, 3500,
+		faker.NewRandomBlinker(15, 40, 1*time.Second, 10*time.Second))
 
 	p.disk1 = faker.NewInterval(2*time.Second,
 		500*time.Millisecond,
