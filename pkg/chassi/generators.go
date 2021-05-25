@@ -95,10 +95,6 @@ func Gen6704() LineCard {
 		Link:   getSliceAddr(leds, 1, 5),
 		Labeled: map[string]*pixel.Pixel{
 			"status": &leds[0],
-			"port0":  &leds[1],
-			"port1":  &leds[2],
-			"port2":  &leds[3],
-			"port3":  &leds[4],
 		},
 	}
 

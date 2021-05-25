@@ -17,10 +17,10 @@ func (p *X6704) Render(info RenderInfo, c *chassi.Chassi) {
 		p.Labeled["status"].SetClamped(0.0, sys, 0.0)
 
 		blink := utils.Square(math.Sin(utils.Random(1, 5) * time.Since(info.Start).Seconds()))
-		p.Labeled["port0"].SetClamped(0.0, blink, 0.0)
-		p.Labeled["port1"].SetClamped(0.0, blink, 0.0)
-		p.Labeled["port2"].SetClamped(0.0, blink, 0.0)
-		p.Labeled["port3"].SetClamped(0.0, blink, 0.0)
+		p.Labeled["p1"].SetClamped(0.0, blink, 0.0)
+		p.Labeled["p2"].SetClamped(0.0, blink, 0.0)
+		p.Labeled["p3"].SetClamped(0.0, blink, 0.0)
+		p.Labeled["p4"].SetClamped(0.0, blink, 0.0)
 
 	}
 }

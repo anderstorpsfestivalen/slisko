@@ -5,6 +5,7 @@ import (
 
 	"github.com/anderstorpsfestivalen/slisko/pkg/chassi"
 	"github.com/anderstorpsfestivalen/slisko/pkg/faker"
+	"github.com/anderstorpsfestivalen/slisko/pkg/utils"
 )
 
 type Blink48Ports struct {
@@ -19,7 +20,7 @@ func (p *Blink48Ports) Render(info RenderInfo, c *chassi.Chassi) {
 
 	for i, card := range c.GetCardOfType("6478") {
 		for k, port := range card.Link {
-			v := p.bport[i+k].Trig()
+			v := utils.Invert(p.bport[i+k].Trig())
 			port.SetClamped(v, v*0.7, 0.0)
 		}
 	}
@@ -42,7 +43,7 @@ func (p *Blink48Ports) Bootstrap(c *chassi.Chassi) {
 					7*time.Second,
 					100*time.Millisecond,
 					12*time.Second,
-					faker.NewBlinker(30),
+					faker.NewRandomBlinker(15, 40, 1*time.Second, 10*time.Second),
 				))
 		}
 	}

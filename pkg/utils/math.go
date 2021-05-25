@@ -44,6 +44,14 @@ func Square(v float64) float64 {
 	}
 }
 
+func DutyCycle(v float64, len float64) float64 {
+	if v > -1+(len*2) {
+		return 1.0
+	} else {
+		return 0.0
+	}
+}
+
 func Invert(v float64) float64 {
 	return 1 - v
 }

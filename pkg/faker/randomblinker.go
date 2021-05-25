@@ -45,7 +45,7 @@ func (b *RandomBlinker) Trig() float64 {
 		b.st = time.Now()
 	}
 
-	return utils.Square(math.Sin(b.speed * time.Since(b.st).Seconds()))
+	return utils.DutyCycle(math.Sin(b.speed*time.Since(b.st).Seconds()), .80)
 }
 
 func (b *RandomBlinker) genDur() time.Duration {

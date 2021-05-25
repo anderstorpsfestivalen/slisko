@@ -1,12 +1,10 @@
 package patterns
 
 import (
-	"math"
 	"time"
 
 	"github.com/anderstorpsfestivalen/slisko/pkg/chassi"
 	"github.com/anderstorpsfestivalen/slisko/pkg/faker"
-	"github.com/anderstorpsfestivalen/slisko/pkg/utils"
 )
 
 type SUP720 struct {
@@ -16,8 +14,8 @@ type SUP720 struct {
 
 func (p *SUP720) Render(info RenderInfo, c *chassi.Chassi) {
 	for _, port := range c.GetCardOfType("sup720") {
-		sys := utils.Square(math.Sin(utils.Random(0.00001, 0.01) * time.Since(info.Start).Seconds()))
-		port.Labeled["system"].SetClamped(0.0, sys, 0.0)
+		//sys := utils.Square(math.Sin(utils.Random(0.00001, 0.01) * time.Since(info.Start).Seconds()))
+		port.Labeled["system"].SetClamped(0.0, 1.0, 0.0)
 
 		port.Labeled["active"].SetClamped(0.0, 1.0, 0.0)
 		port.Labeled["mgmt"].SetClamped(1.0, 0.5, 0.0)
@@ -45,8 +43,8 @@ func (p *SUP720) Bootstrap(c *chassi.Chassi) {
 		3500*time.Millisecond,
 		faker.NewRandomBlinker(15, 40, 1*time.Second, 10*time.Second))
 
-	p.disk1 = faker.NewInterval(2*time.Second,
-		500*time.Millisecond,
+	p.disk1 = faker.NewInterval(3*time.Second,
+		600*time.Millisecond,
 		faker.NewBlinker(30),
 	)
 }
