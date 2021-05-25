@@ -1,10 +1,8 @@
 package patterns
 
 import (
-	"math"
-	"time"
-
 	"github.com/anderstorpsfestivalen/slisko/pkg/chassi"
+	"github.com/anderstorpsfestivalen/slisko/pkg/utils"
 	"github.com/lucasb-eyer/go-colorful"
 )
 
@@ -15,7 +13,8 @@ type Colorcycler struct {
 
 func (p *Colorcycler) Render(info RenderInfo, c *chassi.Chassi) {
 
-	v := (math.Sin(1*time.Since(info.Start).Seconds()) + 2) / 2 * 360
+	//v := (math.Sin(time.Since(info.Start).Seconds()) + 1) / 2 * 360
+	v := utils.Triangle(info.Start, 2, 1.0) * 360
 	p.color = colorful.Hsv(v, 1.0, 1.0)
 	for _, port := range c.LEDs {
 		port.SetClamped(p.color.R, p.color.G, p.color.B)
