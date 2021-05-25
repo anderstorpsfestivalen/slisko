@@ -12,7 +12,7 @@ type X6704 struct {
 }
 
 func (p *X6704) Render(info RenderInfo, c *chassi.Chassi) {
-	for _, p := range c.GetCardOfType("x6704") {
+	for _, p := range c.GetCardOfType("6704") {
 		sys := utils.Square(math.Sin(utils.Random(0.00001, 0.01) * time.Since(info.Start).Seconds()))
 		p.Labeled["status"].SetClamped(0.0, sys, 0.0)
 
