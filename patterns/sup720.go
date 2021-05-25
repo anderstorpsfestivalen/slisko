@@ -10,6 +10,7 @@ import (
 )
 
 type SUP720 struct {
+	disk0 *faker.RandomInterval
 	disk1 *faker.Interval
 }
 
@@ -21,8 +22,7 @@ func (p *SUP720) Render(info RenderInfo, c *chassi.Chassi) {
 		port.Labeled["active"].SetClamped(0.0, 1.0, 0.0)
 		port.Labeled["mgmt"].SetClamped(1.0, 0.5, 0.0)
 
-		disk0 := utils.Square(math.Sin(utils.Random(1, 5) * time.Since(info.Start).Seconds()))
-		port.Labeled["disk0"].SetClamped(0.0, disk0, 0.0)
+		port.Labeled["disk0"].SetClamped(0.0, p.disk0.Trig(), 0.0)
 
 		//disk1 := utils.Square(math.Sin(utils.Random(1, 5) * time.Since(info.Start).Seconds()))
 		//disk1 := utils.Square(math.Sin(20 * time.Since(info.Start).Seconds()))
@@ -39,6 +39,8 @@ func (p *SUP720) Info() PatternInfo {
 }
 
 func (p *SUP720) Bootstrap() {
+	p.disk0 = faker.NewRandomInterval(400, 6000, 100, 3500, faker.NewBlinker(25))
+
 	p.disk1 = faker.NewInterval(2*time.Second,
 		500*time.Millisecond,
 		faker.NewBlinker(30),

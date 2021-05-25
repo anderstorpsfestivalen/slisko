@@ -37,3 +37,7 @@ func Square(v float64) float64 {
 		return 0.0
 	}
 }
+
+func Invert(v float64) float64 {
+	return 1 - v
+}
