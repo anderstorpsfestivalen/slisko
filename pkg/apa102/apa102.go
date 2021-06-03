@@ -4,6 +4,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/anderstorpsfestivalen/slisko/pkg/pixel"
+	"periph.io/x/conn/v3/physic"
 	"periph.io/x/conn/v3/spi"
 	"periph.io/x/conn/v3/spi/spireg"
 	"periph.io/x/devices/v3/apa102"
@@ -21,7 +22,7 @@ type APA102 struct {
 	initated bool
 }
 
-func New(port string, numPixels int64, brightness uint8, mhz int64, trigger chan bool) (*APA102, error) {
+func New(port string, numPixels int64, brightness uint8, portSpeed string, trigger chan bool) (*APA102, error) {
 	if _, err := host.Init(); err != nil {
 		return &APA102{renderTrigger: trigger, outputBuf: make([]byte, numPixels*3)}, err
 	}
@@ -37,6 +38,12 @@ func New(port string, numPixels int64, brightness uint8, mhz int64, trigger chan
 			"MOSI": p.MOSI(),
 		}).Info("SPI Pins")
 	}
+
+	sp := 20 * physic.MegaHertz
+	if portSpeed != "" {
+		sp.Set(portSpeed)
+	}
+	s1.LimitSpeed(sp)
 
 	opts := apa102.DefaultOpts
 	opts.NumPixels = int(numPixels)

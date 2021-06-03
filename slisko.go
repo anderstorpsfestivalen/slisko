@@ -56,7 +56,7 @@ func main() {
 	apa, err := apa102.New("/dev/spidev0.0",
 		144,                // NUM LEDS
 		uint8(*brightness), //BRIGHTNESS
-		8,                  // MHZ (not used rihgt now hahahaha)
+		"20Mhz",            // MHZ (not used rihgt now hahahaha)
 		ctrl.FrameBroker.Subscribe())
 	if err != nil {
 		log.Error(err)
