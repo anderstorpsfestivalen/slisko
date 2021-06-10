@@ -25,6 +25,7 @@ type Controller struct {
 	ticker *time.Ticker
 
 	framerate      int
+	frame          int64
 	Updates        chan map[string][]TP
 	activePatterns []patterns.Pattern
 
@@ -55,6 +56,7 @@ func (ctrl *Controller) Start(framerate int) {
 
 func (ctrl *Controller) Stop() {
 	ctrl.ticker.Stop()
+	ctrl.frame = 0
 }
 
 func (ctrl *Controller) ListPatterns() []patterns.PatternInfo {
@@ -146,6 +148,7 @@ func (ctrl *Controller) render() {
 		_ = <-ctrl.ticker.C
 		info := patterns.RenderInfo{
 			Start: ctrl.start,
+			Frame: ctrl.frame,
 		}
 		for _, p := range ctrl.activePatterns {
 			if p.Info().Category == "global" {
@@ -157,6 +160,8 @@ func (ctrl *Controller) render() {
 			p.Render(info, ctrl.c)
 		}
 		ctrl.FrameBroker.Publish(true)
+
+		ctrl.frame = ctrl.frame + 1
 	}
 }
 
