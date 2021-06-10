@@ -47,6 +47,7 @@ func main() {
 	ctrl.EnablePattern("greenstatus")
 	ctrl.EnablePattern("sup720")
 	ctrl.EnablePattern("x6704")
+	ctrl.EnablePattern("snake")
 
 	api := api.New(&c, &ctrl)
 	go api.Start("0.0.0.0:3000")
