@@ -1,28 +1,27 @@
 package patterns
 
 import (
-	"time"
-
 	"github.com/anderstorpsfestivalen/slisko/pkg/chassi"
 )
 
 type Snake struct {
+	snakeFrame int64
 }
 
 func (p *Snake) Render(info RenderInfo, c *chassi.Chassi) {
-	//v := utils.Square(math.Sin(utils.Random(1, 5) * time.Since(info.Start).Seconds()))
-	for i := 0; i < len(c.LEDs); i++ {
-		for m, port := range c.LEDs {
-			if m == i {
-				port.SetClamped(128, 128, 128)
-				time.Sleep(5 * time.Millisecond)
-			} else {
-				port.SetClamped(0, 0, 0)
-				time.Sleep(5 * time.Millisecond)
-			}
-		}
+	if p.snakeFrame > int64(len(c.LEDs)) {
+		p.snakeFrame = 0
+	} else {
+		p.snakeFrame = p.snakeFrame + 1
 	}
 
+	for m, port := range c.LEDs {
+		if m == int(p.snakeFrame) {
+			port.SetClamped(0.5, 0.5, 0.5)
+		} else {
+			port.SetClamped(0.0, 0.0, 0.0)
+		}
+	}
 }
 
 func (p *Snake) Info() PatternInfo {
