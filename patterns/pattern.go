@@ -13,6 +13,7 @@ type PatternInfo struct {
 
 type RenderInfo struct {
 	Start time.Time
+	Frame int64
 }
 
 type Pattern interface {
