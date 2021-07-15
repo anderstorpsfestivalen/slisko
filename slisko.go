@@ -76,8 +76,16 @@ func main() {
 	}
 
 	//Generate a test 6704 + 1 blank
+
+	apa.Map(c.LineCards[0].LEDs)
+	apa.Map(c.LineCards[1].LEDs)
+	apa.Map(c.LineCards[2].LEDs)
 	apa.Map(c.LineCards[3].LEDs)
-	apa.Map(apa102.GenEmpty(1))
+	apa.Map(c.LineCards[4].LEDs)
+	apa.Map(c.LineCards[5].LEDs)
+	apa.Map(c.LineCards[6].LEDs)
+	apa.Map(c.LineCards[7].LEDs)
+	apa.Map(c.LineCards[8].LEDs)
 	go apa.Run()
 
 	if isFlagPassed("console") {
