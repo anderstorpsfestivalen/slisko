@@ -33,6 +33,7 @@ func (p *Mapper) Render(info RenderInfo, c *chassi.Chassi) {
 
 	v = c.GetCardOfType("6478")[1]
 	v.Status.G = 1.0
+
 }
 
 func (p *Mapper) Info() PatternInfo {

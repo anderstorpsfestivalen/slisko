@@ -44,12 +44,12 @@ func main() {
 
 	ctrl := controller.New(&c)
 	ctrl.Start(*fps)
-	// ctrl.EnablePattern("blink48ports")
+	//ctrl.EnablePattern("blink48ports")
 	// ctrl.EnablePattern("greenstatus")
 	// ctrl.EnablePattern("sup720")
 	// ctrl.EnablePattern("x6704")
 	// ctrl.EnablePattern("snake")
-	//ctrl.EnablePattern("mapper")
+	ctrl.EnablePattern("mapper")
 
 	api := api.New(&c, &ctrl)
 	go api.Start("0.0.0.0:3000")
@@ -80,22 +80,20 @@ func main() {
 	//Generate a test 6704 + 1 blank
 	apa.Map(apa102.GenEmpty(1))
 	apa.Map(c.LineCards[0].LEDs)
-	apa.Map(c.LineCards[1].LEDs)
-	apa.Map(c.LineCards[2].LEDs)
-	apa.Map(apa102.GenEmpty(1))
-	apa.Map(c.LineCards[3].LEDs)
-	apa.Map(apa102.GenEmpty(1))
-	apa.Map(c.LineCards[4].LEDs)
-	apa.Map(c.LineCards[5].LEDs)
-	apa.Map(c.LineCards[6].LEDs)
-	apa.Map(apa102.GenEmpty(1))
-	apa.Map(c.LineCards[7].LEDs)
 	apa.Map(apa102.GenEmpty(1))
 	apa.Map(c.LineCards[8].LEDs)
+	//apa.Map(c.LineCards[7].LEDs)
+	// apa.Map(c.LineCards[3].LEDs)
+	// apa.Map(c.LineCards[4].LEDs)
+	// apa.Map(c.LineCards[5].LEDs)
+	// apa.Map(c.LineCards[6].LEDs)
+	// apa.Map(c.LineCards[7].LEDs)
 
-	for _, v := range c.LineCards {
-		fmt.Println(len(v.LEDs))
-	}
+	// for _, v := range c.LineCards {
+	// 	fmt.Println(len(v.LEDs))
+	// }
+
+	fmt.Println(len(*apa.GetMap()))
 
 	go apa.Run()
 

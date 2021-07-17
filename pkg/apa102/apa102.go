@@ -1,6 +1,8 @@
 package apa102
 
 import (
+	"bytes"
+
 	log "github.com/sirupsen/logrus"
 
 	"github.com/anderstorpsfestivalen/slisko/pkg/pixel"
@@ -18,6 +20,7 @@ type APA102 struct {
 	renderTrigger chan bool
 
 	outputBuf []byte
+	lastBuf   []byte
 
 	initated bool
 }
@@ -57,6 +60,7 @@ func New(port string, numPixels int64, brightness uint8, portSpeed string, trigg
 		port:          s1,
 		strip:         strip,
 		renderTrigger: trigger,
+		lastBuf:       make([]byte, numPixels*3),
 		outputBuf:     make([]byte, numPixels*3),
 		initated:      true,
 	}, nil
@@ -71,10 +75,15 @@ func (a *APA102) Run() {
 			a.outputBuf[i*3+2] = pixel.Clamp255(l.B * 255)
 		}
 
-		if a.initated {
-			tmp := append([]byte(nil), a.outputBuf...)
-			a.strip.Write(tmp)
+		if !bytes.Equal(a.outputBuf, a.lastBuf) {
+
+			if a.initated {
+				a.strip.Write(a.outputBuf)
+			}
+
+			a.lastBuf = append([]byte(nil), a.outputBuf...)
 		}
+
 	}
 }
 
