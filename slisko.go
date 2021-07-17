@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -48,7 +49,7 @@ func main() {
 	// ctrl.EnablePattern("sup720")
 	// ctrl.EnablePattern("x6704")
 	// ctrl.EnablePattern("snake")
-	ctrl.EnablePattern("mapper")
+	//ctrl.EnablePattern("mapper")
 
 	api := api.New(&c, &ctrl)
 	go api.Start("0.0.0.0:3000")
@@ -56,7 +57,7 @@ func main() {
 	//APA102 DEFINITION
 
 	apa, err := apa102.New("/dev/spidev0.0",
-		144,                // NUM LEDS
+		132,                // NUM LEDS
 		uint8(*brightness), //BRIGHTNESS
 		"20Mhz",            // MHZ (not used rihgt now hahahaha)
 		ctrl.FrameBroker.Subscribe())
@@ -91,6 +92,11 @@ func main() {
 	apa.Map(c.LineCards[7].LEDs)
 	apa.Map(apa102.GenEmpty(1))
 	apa.Map(c.LineCards[8].LEDs)
+
+	for _, v := range c.LineCards {
+		fmt.Println(len(v.LEDs))
+	}
+
 	go apa.Run()
 
 	if isFlagPassed("console") {

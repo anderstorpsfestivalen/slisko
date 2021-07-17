@@ -39,12 +39,6 @@ func New(port string, numPixels int64, brightness uint8, portSpeed string, trigg
 		}).Info("SPI Pins")
 	}
 
-	sp := 20 * physic.MegaHertz
-	if portSpeed != "" {
-		sp.Set(portSpeed)
-	}
-	s1.LimitSpeed(sp)
-
 	opts := apa102.DefaultOpts
 	opts.NumPixels = int(numPixels)
 	opts.Intensity = brightness
@@ -52,6 +46,12 @@ func New(port string, numPixels int64, brightness uint8, portSpeed string, trigg
 	if err != nil {
 		return &APA102{renderTrigger: trigger, outputBuf: make([]byte, numPixels*3)}, err
 	}
+
+	sp := 10 * physic.MegaHertz
+	if portSpeed != "" {
+		sp.Set(portSpeed)
+	}
+	s1.LimitSpeed(sp)
 
 	return &APA102{
 		port:          s1,
@@ -72,7 +72,8 @@ func (a *APA102) Run() {
 		}
 
 		if a.initated {
-			a.strip.Write(a.outputBuf)
+			tmp := append([]byte(nil), a.outputBuf...)
+			a.strip.Write(tmp)
 		}
 	}
 }

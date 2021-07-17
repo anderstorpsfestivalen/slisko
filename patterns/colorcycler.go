@@ -14,7 +14,8 @@ type Colorcycler struct {
 func (p *Colorcycler) Render(info RenderInfo, c *chassi.Chassi) {
 
 	//v := (math.Sin(time.Since(info.Start).Seconds()) + 1) / 2 * 360
-	v := utils.Triangle(info.Start, 2, 1.0) * 360
+	//v := utils.Triangle(info.Start, 2, 1.0) * 360
+	v := utils.Sin(info.Start, 0.2) * 360
 	p.color = colorful.Hsv(v, 1.0, 1.0)
 	for _, port := range c.LEDs {
 		port.SetClamped(p.color.R, p.color.G, p.color.B)
