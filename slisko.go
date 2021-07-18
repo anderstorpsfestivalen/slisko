@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -93,8 +92,6 @@ func main() {
 	// for _, v := range c.LineCards {
 	// 	fmt.Println(len(v.LEDs))
 	// }
-
-	fmt.Println(len(*apa.GetMap()))
 
 	go apa.Run()
 
