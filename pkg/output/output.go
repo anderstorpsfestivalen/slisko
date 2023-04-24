@@ -6,6 +6,11 @@ import (
 	"github.com/anderstorpsfestivalen/slisko/pkg/pixel"
 )
 
+type Device interface {
+	Write(pixels *[]byte) (int, error)
+	Close() error
+}
+
 type Output struct {
 	mapping       []*pixel.Pixel
 	renderTrigger chan bool
@@ -13,13 +18,17 @@ type Output struct {
 	outputBuf []byte
 	lastBuf   []byte
 
+	device Device
+
 	initated bool
 }
 
-func New(numPixels int64, trigger chan bool) (*Output, error) {
+func New(numPixels int64, device Device, trigger chan bool) (*Output, error) {
 
 	return &Output{
 		renderTrigger: trigger,
+		device:        device,
+		lastBuf:       make([]byte, numPixels*3),
 		outputBuf:     make([]byte, numPixels*3),
 	}, nil
 }
@@ -36,7 +45,7 @@ func (a *Output) Run() {
 		if !bytes.Equal(a.outputBuf, a.lastBuf) {
 
 			if a.initated {
-				//a.strip.Write(a.outputBuf)
+				a.device.Write(&a.outputBuf)
 			}
 
 			a.lastBuf = append([]byte(nil), a.outputBuf...)
@@ -68,11 +77,9 @@ func (a *Output) Clear() {
 	for i, _ := range a.outputBuf {
 		a.outputBuf[i] = 0
 	}
-	if a.initated {
-		//a.strip.Write(a.outputBuf)
-	}
+	a.device.Write(&a.outputBuf)
 }
 
 func (a *Output) Close() {
-	//a.port.Close()
+	a.device.Close()
 }
