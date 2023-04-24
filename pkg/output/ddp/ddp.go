@@ -4,7 +4,29 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"net"
 )
+
+type DDPClient struct {
+	conn *net.TCPConn
+}
+
+func Connect(hoststring string) (*DDPClient, error) {
+
+	tcpAddr, err := net.ResolveTCPAddr("tcp", hoststring)
+	if err != nil {
+		return nil, err
+	}
+
+	conn, err := net.DialTCP("tcp", nil, tcpAddr)
+	if err != nil {
+		return nil, err
+	}
+
+	return &DDPClient{
+		conn: conn,
+	}, nil
+}
 
 /// Based on http://www.3waylabs.com/ddp/
 
