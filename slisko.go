@@ -104,49 +104,8 @@ func main() {
 	op.Map(output.GenEmpty(1))
 	op.Map(c.LineCards[1].LEDs)
 
+	// Start output pump
 	go op.Run()
-
-	// if isFlagPassed("spi") {
-	// 	apa, err := apa102.New("/dev/spidev0.0",
-	// 		132,                // NUM LEDS
-	// 		uint8(*brightness), //BRIGHTNESS
-	// 		"20Mhz",            // MHZ (not used rihgt now hahahaha)
-	// 		ctrl.FrameBroker.Subscribe())
-	// 	if err != nil {
-	// 		log.Error(err)
-	// 		log.Error("SPI FAILED TO INITALIZE, THE LED STRIP WILL NOT WORK")
-	// 	} else {
-	// 		//Clear strip when exiting
-	// 		c := make(chan os.Signal, 1)
-	// 		signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	// 		go func() {
-	// 			<-c
-	// 			ctrl.Stop()
-	// 			apa.Clear()
-	// 			apa.Close()
-	// 			os.Exit(1)
-	// 		}()
-	// 	}
-
-	// 	//Generate a test 6704 + 1 blank
-	// 	apa.Map(apa102.GenEmpty(1))
-	// 	apa.Map(c.LineCards[0].LEDs)
-	// 	apa.Map(apa102.GenEmpty(1))
-	// 	apa.Map(c.LineCards[8].LEDs)
-	// 	apa.Map(c.LineCards[7].LEDs)
-	// 	apa.Map(c.LineCards[5].LEDs)
-	// 	apa.Map(apa102.GenEmpty(1))
-	// 	apa.Map(c.LineCards[4].LEDs)
-	// 	apa.Map(c.LineCards[3].LEDs)
-	// 	apa.Map(apa102.GenEmpty(1))
-	// 	apa.Map(c.LineCards[1].LEDs)
-
-	// 	// for _, v := range c.LineCards {
-	// 	// 	fmt.Println(len(v.LEDs))
-	// 	// }
-
-	// 	go apa.Run()
-	// }
 
 	if isFlagPassed("console") {
 		console := console.New(op.GetMap(), ctrl.FrameBroker.Subscribe())
