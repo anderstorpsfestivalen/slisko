@@ -71,16 +71,16 @@ func (a *APA102) GetMap() *[]*pixel.Pixel {
 	return &a.mapping
 }
 
-func (a *APA102) Write(pixels *[]byte) (int, error) {
+func (a *APA102) Write(pixels []byte) (int, error) {
 	if a.initated {
-		return a.strip.Write(*pixels)
+		return a.strip.Write(pixels)
 	}
 	return 0, fmt.Errorf("apa102 not initalized")
 }
 
 func (a *APA102) Clear() {
 	data := make([]byte, a.numPixels*3)
-	a.Write(&data)
+	a.Write(data)
 }
 
 func (a *APA102) Close() error {

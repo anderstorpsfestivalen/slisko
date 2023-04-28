@@ -7,7 +7,7 @@ import (
 )
 
 type Device interface {
-	Write(pixels *[]byte) (int, error)
+	Write(pixels []byte) (int, error)
 	Close() error
 }
 
@@ -19,8 +19,6 @@ type Output struct {
 	lastBuf   []byte
 
 	device Device
-
-	initated bool
 }
 
 func New(numPixels int64, device Device, trigger chan bool) (*Output, error) {
@@ -41,12 +39,9 @@ func (a *Output) Run() {
 			a.outputBuf[i*3+1] = pixel.Clamp255(l.G * 255)
 			a.outputBuf[i*3+2] = pixel.Clamp255(l.B * 255)
 		}
-
 		if !bytes.Equal(a.outputBuf, a.lastBuf) {
 
-			if a.initated {
-				a.device.Write(&a.outputBuf)
-			}
+			a.device.Write(a.outputBuf)
 
 			a.lastBuf = append([]byte(nil), a.outputBuf...)
 		}
@@ -55,7 +50,7 @@ func (a *Output) Run() {
 }
 
 func (a *Output) Map(nm []pixel.Pixel) {
-	for z, _ := range nm {
+	for z := range nm {
 		a.mapping = append(a.mapping, &nm[z])
 	}
 }
@@ -74,10 +69,10 @@ func GenEmpty(num int) []pixel.Pixel {
 }
 
 func (a *Output) Clear() {
-	for i, _ := range a.outputBuf {
+	for i := range a.outputBuf {
 		a.outputBuf[i] = 0
 	}
-	a.device.Write(&a.outputBuf)
+	a.device.Write(a.outputBuf)
 }
 
 func (a *Output) Close() {

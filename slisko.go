@@ -14,6 +14,7 @@ import (
 	"github.com/anderstorpsfestivalen/slisko/pkg/output/apa102"
 	"github.com/anderstorpsfestivalen/slisko/pkg/output/null"
 	"github.com/anderstorpsfestivalen/slisko/simulator"
+	"github.com/coral/ddp"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -21,6 +22,8 @@ func main() {
 	flag.Bool("simulator", false, "enables the simulator")
 	flag.Bool("console", false, "Enables LED console op")
 	flag.Bool("spi", false, "Enables LED spi op")
+	flag.Bool("ddp", false, "Enables DDP output")
+	ddpHost := flag.String("ddphost", "", "ddp host")
 	brightness := flag.Uint("brightness", 255, "override global brightness")
 	fps := flag.Int("fps", 60, "override the FPS")
 	numLeds := flag.Int64("leds", 132, "number of leds")
@@ -84,6 +87,17 @@ func main() {
 			}()
 		}
 		selectedDevice = sl
+	}
+
+	if isFlagPassed("ddp") {
+		ddpClient := ddp.NewDDPClient()
+		err := ddpClient.ConnectUDP(*ddpHost)
+		if err != nil {
+			panic(err)
+		}
+
+		selectedDevice = ddpClient
+
 	}
 
 	op, err := output.New(*numLeds, selectedDevice, ctrl.FrameBroker.Subscribe())

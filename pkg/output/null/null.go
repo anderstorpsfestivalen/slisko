@@ -3,7 +3,7 @@ package null
 type Null struct {
 }
 
-func (a *Null) Write(pixels *[]byte) (int, error) {
+func (a *Null) Write(pixels []byte) (int, error) {
 	return 0, nil
 }
 
