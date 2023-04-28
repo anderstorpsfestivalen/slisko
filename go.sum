@@ -7,6 +7,8 @@ github.com/chenzhuoyu/base64x v0.0.0-20221115062448-fe3a3abad311 h1:qSGYFH7+jGhD
 github.com/chenzhuoyu/base64x v0.0.0-20221115062448-fe3a3abad311/go.mod h1:b583jCggY9gE99b6G5LEC39OIiVsWj+R97kbl5odCEk=
 github.com/coral/ddp v0.0.0-20230428061619-54b3d5597604 h1:PwSW0L1iQk/2EJs4jTcbWqUmGx4V/5DBEcd77XewTro=
 github.com/coral/ddp v0.0.0-20230428061619-54b3d5597604/go.mod h1:/C4M49wZTSw+yo7flzpV8gXgwAuqrXhLbVTRONCjeqU=
+github.com/coral/ddp v0.1.0 h1:vmudhHp+gu3ZooVOFKqYm4JJiK7EiFLphZ+5k0XccVU=
+github.com/coral/ddp v0.1.0/go.mod h1:/C4M49wZTSw+yo7flzpV8gXgwAuqrXhLbVTRONCjeqU=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=

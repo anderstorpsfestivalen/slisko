@@ -5,7 +5,7 @@ go 1.18
 //replace github.com/coral/ddp => ../../coral/ddp
 
 require (
-	github.com/coral/ddp v0.0.0-20230428061619-54b3d5597604
+	github.com/coral/ddp v0.1.0
 	github.com/faiface/pixel v0.10.0
 	github.com/gin-contrib/static v0.0.1
 	github.com/gin-gonic/contrib v0.0.0-20221130124618-7e01895a63f2
