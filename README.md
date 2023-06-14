@@ -2,7 +2,7 @@
 
 **Installation**
 
-To run on Linux, install the following packages: libgl1-mesa-dev xorg-dev libglfw-dev
+To run on Linux, install the following packages: libgl1-mesa-dev xorg-dev build-essential libglfw3-dev
 
 **Architecture**
 ```
