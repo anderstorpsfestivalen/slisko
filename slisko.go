@@ -90,7 +90,7 @@ func main() {
 	}
 
 	if isFlagPassed("ddp") {
-		ddpClient := ddp.NewDDPClient()
+		ddpClient := ddp.NewDDPController()
 		err := ddpClient.ConnectUDP(*ddpHost)
 		if err != nil {
 			panic(err)
