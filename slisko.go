@@ -13,6 +13,7 @@ import (
 	"github.com/anderstorpsfestivalen/slisko/pkg/output"
 	"github.com/anderstorpsfestivalen/slisko/pkg/output/apa102"
 	"github.com/anderstorpsfestivalen/slisko/pkg/output/null"
+	"github.com/anderstorpsfestivalen/slisko/pkg/output/wledapa"
 	"github.com/anderstorpsfestivalen/slisko/simulator"
 	"github.com/coral/ddp"
 	log "github.com/sirupsen/logrus"
@@ -91,12 +92,15 @@ func main() {
 
 	if isFlagPassed("ddp") {
 		ddpClient := ddp.NewDDPController()
+
 		err := ddpClient.ConnectUDP(*ddpHost)
 		if err != nil {
 			panic(err)
 		}
 
-		selectedDevice = ddpClient
+		ww := wledapa.NewWLEDAPA(ddpClient)
+
+		selectedDevice = ww
 
 	}
 

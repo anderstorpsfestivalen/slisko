@@ -38,7 +38,9 @@ func (a *Output) Run() {
 			a.outputBuf[i*3] = pixel.Clamp255(l.R * 255)
 			a.outputBuf[i*3+1] = pixel.Clamp255(l.G * 255)
 			a.outputBuf[i*3+2] = pixel.Clamp255(l.B * 255)
+
 		}
+
 		if !bytes.Equal(a.outputBuf, a.lastBuf) {
 
 			a.device.Write(a.outputBuf)
