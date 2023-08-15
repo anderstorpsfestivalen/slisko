@@ -25,9 +25,9 @@ func (p *Blink48Ports) Render(info RenderInfo, c *chassi.Chassi) {
 	for _, port := range p.bport {
 		v := utils.Invert(port.faker.Trig())
 		if port.speed {
-			port.port.SetClamped(v*0.5, v*1.0, v*0.3)
+			port.port.SetClamped(v*0.3, v*1.0, v*0.00)
 		} else {
-			port.port.SetClamped(v*1.0, v*1.0, v*0.3)
+			port.port.SetClamped(v*1.0, v*0.5, v*0.00)
 		}
 	}
 

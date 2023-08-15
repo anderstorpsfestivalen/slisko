@@ -27,7 +27,7 @@ func (p *X6704) Render(info RenderInfo, c *chassi.Chassi) {
 
 	for _, p := range p.bport {
 		v := utils.Invert(p.faker.Trig())
-		p.port.SetClamped(v*0.5, v*1.0, v*0.3)
+		p.port.SetClamped(v*0.3, v*1.0, v*0.00)
 	}
 }
 

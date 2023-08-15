@@ -20,9 +20,9 @@ type SUP720 struct {
 func (p *SUP720) Render(info RenderInfo, c *chassi.Chassi) {
 	for _, port := range c.GetCardOfType("sup720") {
 		//sys := utils.Square(math.Sin(utils.Random(0.00001, 0.01) * time.Since(info.Start).Seconds()))
-		port.Labeled["system"].SetClamped(0.2, 1.0, 0.2)
+		port.Labeled["system"].SetClamped(0.2, 1.0, 0.0)
 
-		port.Labeled["active"].SetClamped(0.2, 1.0, 0.2)
+		port.Labeled["active"].SetClamped(0.2, 1.0, 0.0)
 		port.Labeled["mgmt"].SetClamped(1.0, 0.0, 0.0)
 
 		port.Labeled["disk0"].SetClamped(0.0, p.disk0.Trig(), 0.0)
@@ -32,10 +32,10 @@ func (p *SUP720) Render(info RenderInfo, c *chassi.Chassi) {
 		port.Labeled["disk1"].SetClamped(0.0, p.disk1.Trig(), 0.0)
 
 		p0 := utils.Invert(p.port0.Trig())
-		port.Labeled["p1"].SetClamped(0.7*p0, 0.8*p0, 0.3*p0)
+		port.Labeled["p1"].SetClamped(0.7*p0, 0.5*p0, 0.0*p0)
 
 		p1 := utils.Invert(p.port1.Trig())
-		port.Labeled["p2"].SetClamped(0.7*p1, 0.8*p1, 0.3*p1)
+		port.Labeled["p2"].SetClamped(0.7*p1, 0.5*p1, 0.*p1)
 
 	}
 }

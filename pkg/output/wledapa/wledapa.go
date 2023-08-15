@@ -49,6 +49,7 @@ func NewWLEDAPA(device *ddp.DDPController) *WLEDAPA {
 	}
 }
 
+// TODO FIX LATER
 func (d *WLEDAPA) Write(pixels []byte) (int, error) {
 
 	if len(pixels)%3 != 0 || len(pixels) > len(pixels) {
@@ -57,7 +58,7 @@ func (d *WLEDAPA) Write(pixels []byte) (int, error) {
 	// Do not touch header and footer
 	d.raster(d.pixels, pixels, false)
 
-	_, err := d.device.Write(d.pixels)
+	_, err := d.device.Write(pixels)
 	return len(pixels), err
 }
 
