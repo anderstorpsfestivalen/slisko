@@ -59,6 +59,8 @@ func (s *Simulator) run() {
 		panic(err)
 	}
 
+	//win.SetPos(pixel.V(50, 300))
+
 	for !win.Closed() {
 
 		s.generateLEDs(win)

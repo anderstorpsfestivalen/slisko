@@ -32,17 +32,7 @@ func main() {
 
 	log.Info("Started Slisko Controller")
 
-	c := chassi.New([]chassi.LineCard{
-		chassi.Gen6478(),
-		chassi.Gen6704(),
-		chassi.GenBlank(),
-		chassi.Gen6704(),
-		chassi.GenSUP720(),
-		chassi.Gen6704(),
-		chassi.GenBlank(),
-		chassi.Gen6704(),
-		chassi.Gen6478(),
-	})
+	c := chassi.New(chassi.GenASR9010Chassi())
 
 	log.WithFields(log.Fields{
 		"linecards": c.GetCardOrder(),
@@ -53,8 +43,9 @@ func main() {
 	ctrl.Start(*fps)
 	ctrl.EnablePattern("blink48ports")
 	ctrl.EnablePattern("greenstatus")
-	ctrl.EnablePattern("sup720")
 	ctrl.EnablePattern("x6704")
+	ctrl.EnablePattern("a9k-8t-l")
+	ctrl.EnablePattern("a9k-40ge-l")
 	// ctrl.EnablePattern("snake")
 	//ctrl.EnablePattern("mapper")
 
@@ -110,17 +101,17 @@ func main() {
 		panic(err)
 	}
 
-	op.Map(output.GenEmpty(1))
-	op.Map(c.LineCards[0].LEDs)
-	op.Map(output.GenEmpty(1))
-	op.Map(c.LineCards[8].LEDs)
-	op.Map(c.LineCards[7].LEDs)
-	op.Map(c.LineCards[5].LEDs)
-	op.Map(output.GenEmpty(1))
-	op.Map(c.LineCards[4].LEDs)
-	op.Map(c.LineCards[3].LEDs)
-	op.Map(output.GenEmpty(1))
-	op.Map(c.LineCards[1].LEDs)
+	// op.Map(output.GenEmpty(1))
+	// op.Map(c.LineCards[0].LEDs)
+	// op.Map(output.GenEmpty(1))
+	// op.Map(c.LineCards[8].LEDs)
+	// op.Map(c.LineCards[7].LEDs)
+	// op.Map(c.LineCards[5].LEDs)
+	// op.Map(output.GenEmpty(1))
+	// op.Map(c.LineCards[4].LEDs)
+	// op.Map(c.LineCards[3].LEDs)
+	// op.Map(output.GenEmpty(1))
+	// op.Map(c.LineCards[1].LEDs)
 
 	// Start output pump
 	go op.Run()

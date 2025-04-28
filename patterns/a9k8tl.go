@@ -8,11 +8,11 @@ import (
 	"github.com/anderstorpsfestivalen/slisko/pkg/utils"
 )
 
-type X6704 struct {
+type A9K8TL struct {
 	bport []mapPort
 }
 
-func (p *X6704) Render(info RenderInfo, c *chassi.Chassi) {
+func (p *A9K8TL) Render(info RenderInfo, c *chassi.Chassi) {
 	//for _, p := range c.GetCardOfType("6704") {
 	//sys := utils.Square(math.Sin(utils.Random(0.00001, 0.01) * time.Since(info.Start).Seconds()))
 	//p.Labeled["status"].SetClamped(0.0, sys, 0.0)
@@ -25,15 +25,15 @@ func (p *X6704) Render(info RenderInfo, c *chassi.Chassi) {
 	}
 }
 
-func (p *X6704) Info() PatternInfo {
+func (p *A9K8TL) Info() PatternInfo {
 	return PatternInfo{
-		Name:     "x6704",
+		Name:     "a9k-8t-l",
 		Category: "misc",
 	}
 }
 
-func (p *X6704) Bootstrap(c *chassi.Chassi) {
-	for _, card := range c.GetCardOfType("6704") {
+func (p *A9K8TL) Bootstrap(c *chassi.Chassi) {
+	for _, card := range c.GetCardOfType("A9K-8T-L") {
 		for _, c := range card.Link {
 			p.bport = append(p.bport, mapPort{
 				faker: faker.NewRandomInterval(
