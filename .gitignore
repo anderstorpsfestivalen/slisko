@@ -18,3 +18,7 @@ yarn-error.log*
 *.njsproj
 *.sln
 *.sw*
+
+assets/.DS_Store
+
+*.DS_Store

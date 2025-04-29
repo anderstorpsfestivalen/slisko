@@ -26,19 +26,19 @@ func GenA9KRSP440SE() LineCard {
 		Active: true,
 		LEDs:   leds,
 
-		Status: &leds[0],
+		Status: &leds[12],
 		Link:   getSliceAddr(leds, 0, 12),
 		Labeled: map[string]*pixel.Pixel{
-			"status":   &leds[0],
-			"fail":     &leds[1],
-			"crit":     &leds[2],
-			"sso":      &leds[3],
-			"aco":      &leds[4],
-			"maj":      &leds[5],
-			"fc_fault": &leds[5],
-			"sync":     &leds[5],
-			"min":      &leds[5],
-			"gps":      &leds[5],
+			"status":   &leds[12],
+			"fail":     &leds[13],
+			"crit":     &leds[14],
+			"sso":      &leds[15],
+			"aco":      &leds[16],
+			"maj":      &leds[17],
+			"fc_fault": &leds[18],
+			"sync":     &leds[19],
+			"min":      &leds[20],
+			"gps":      &leds[21],
 		},
 	}
 
@@ -49,7 +49,8 @@ func GenA9KRSP440SE() LineCard {
 	setManyPixelPositons(l.LEDs, []pixel.Position{
 
 		//Sync 0
-		{X: 24, Y: 57, Size: 5},
+		{X: 24, Y: 68, Size: 5},
+		{X: 24, Y: 78, Size: 5},
 	})
 
 	return l

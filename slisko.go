@@ -46,7 +46,7 @@ func main() {
 	ctrl.EnablePattern("x6704")
 	ctrl.EnablePattern("a9k-8t-l")
 	ctrl.EnablePattern("a9k-40ge-l")
-	// ctrl.EnablePattern("snake")
+	ctrl.EnablePattern("static")
 	//ctrl.EnablePattern("mapper")
 
 	api := api.New(&c, &ctrl)

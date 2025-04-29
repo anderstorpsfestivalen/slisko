@@ -20,6 +20,7 @@ var pt = map[string]patterns.Pattern{
 	"mapper":       &patterns.Mapper{},
 	"a9k-8t-l":     &patterns.A9K8TL{},
 	"a9k-40ge-l":   &patterns.A9K40GE{},
+	"static":       &patterns.Static{},
 }
 
 type Controller struct {
