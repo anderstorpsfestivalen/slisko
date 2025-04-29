@@ -49,9 +49,11 @@ func (s *Simulator) run() {
 		panic(err)
 	}
 
+	width := 108 * len(s.c.LineCards)
+
 	cfg := opengl.WindowConfig{
 		Title:  "Slisko Simulator",
-		Bounds: pixel.R(0, 0, float64(s.width), float64(s.height)),
+		Bounds: pixel.R(0, 0, float64(width), float64(s.height)),
 		VSync:  true,
 	}
 	win, err := opengl.NewWindow(cfg)
@@ -69,7 +71,7 @@ func (s *Simulator) run() {
 			s.glcs[i].Sprite.Draw(win,
 				pixel.IM.Moved(
 					win.Bounds().Center().
-						Sub(pixel.V(432, 0)).
+						Sub(pixel.V(float64(108*(len(s.c.LineCards)-1)/2), 0)).
 						Add(s.glcs[i].Pos)))
 		}
 		for _, p := range s.LEDs {

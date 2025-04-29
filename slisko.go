@@ -128,6 +128,7 @@ func main() {
 	}
 
 	if isFlagPassed("simulator") {
+
 		sim := simulator.New(c, (108 * 9), 1000, ctrl.FrameBroker.Subscribe())
 		sim.Start()
 	} else {
