@@ -2,23 +2,6 @@ package chassi
 
 import "github.com/anderstorpsfestivalen/slisko/pkg/pixel"
 
-func Gen7609Chassi() []LineCard {
-
-	chassi := []LineCard{
-		Gen6478(),
-		Gen6704(),
-		GenBlank(),
-		Gen6704(),
-		GenSUP720(),
-		Gen6704(),
-		GenBlank(),
-		Gen6704(),
-		Gen6478(),
-	}
-
-	return chassi
-}
-
 func Gen6478() LineCard {
 
 	leds := make([]pixel.Pixel, 49)
