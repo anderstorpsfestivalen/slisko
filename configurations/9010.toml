@@ -1,0 +1,4 @@
+# ASR 9010
+
+LEDAmount = 200
+Linecards = ["a9k-8t-l", "blank", "a9k-40ge-l", "blank", "a9k-rsp400-se"]

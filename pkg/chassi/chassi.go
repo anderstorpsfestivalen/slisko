@@ -10,6 +10,24 @@ type Chassi struct {
 	StatusLEDs []*pixel.Pixel
 }
 
+func CardsFromDefinition(s []string) []LineCard {
+	chassi := []LineCard{}
+	for _, v := range s {
+		switch v {
+		case "a9k-8t-l":
+			chassi = append(chassi, GenA9K8T())
+		case "blank":
+			chassi = append(chassi, GenBlank())
+		case "a9k-40ge-l":
+			chassi = append(chassi, GenA9K40GE())
+		case "a9k-rsp400-se":
+			chassi = append(chassi, GenA9KRSP440SE())
+		}
+
+	}
+	return chassi
+}
+
 func New(l []LineCard) Chassi {
 	c := Chassi{
 		LineCards: l,

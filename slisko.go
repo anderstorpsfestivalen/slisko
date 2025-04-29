@@ -2,12 +2,14 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/anderstorpsfestivalen/slisko/pkg/api"
 	"github.com/anderstorpsfestivalen/slisko/pkg/chassi"
+	"github.com/anderstorpsfestivalen/slisko/pkg/configuration"
 	"github.com/anderstorpsfestivalen/slisko/pkg/console"
 	"github.com/anderstorpsfestivalen/slisko/pkg/controller"
 	"github.com/anderstorpsfestivalen/slisko/pkg/output"
@@ -32,7 +34,15 @@ func main() {
 
 	log.Info("Started Slisko Controller")
 
-	c := chassi.New(chassi.GenASR9010Chassi())
+	ChassiDefinition, err := configuration.LoadFromFile("configurations/9010.toml")
+	if err != nil {
+		log.Error(err)
+		panic(err)
+	}
+
+	fmt.Println(ChassiDefinition)
+
+	c := chassi.New(chassi.CardsFromDefinition(ChassiDefinition.Linecards))
 
 	log.WithFields(log.Fields{
 		"linecards": c.GetCardOrder(),
