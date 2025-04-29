@@ -7,12 +7,52 @@ func GenASR9010Chassi() []LineCard {
 	chassi := []LineCard{
 		GenA9K8T(),
 		GenA9K40GE(),
+		GenA9KRSP440SE(),
 		GenBlank(),
 		Gen6704(),
 		GenSUP720(),
 	}
 
 	return chassi
+}
+
+func GenA9KRSP440SE() LineCard {
+
+	leds := make([]pixel.Pixel, 24)
+
+	l := LineCard{
+		Name:   "A9K-RSP440-SE",
+		Image:  "a9k-rsp440-se.png",
+		Active: true,
+		LEDs:   leds,
+
+		Status: &leds[0],
+		Link:   getSliceAddr(leds, 0, 12),
+		Labeled: map[string]*pixel.Pixel{
+			"status":   &leds[0],
+			"fail":     &leds[1],
+			"crit":     &leds[2],
+			"sso":      &leds[3],
+			"aco":      &leds[4],
+			"maj":      &leds[5],
+			"fc_fault": &leds[5],
+			"sync":     &leds[5],
+			"min":      &leds[5],
+			"gps":      &leds[5],
+		},
+	}
+
+	for k, v := range getSliceMap(getSliceAddr(leds, 0, 12), "p") {
+		l.Labeled[k] = v
+	}
+
+	setManyPixelPositons(l.LEDs, []pixel.Position{
+
+		//Sync 0
+		{X: 24, Y: 57, Size: 5},
+	})
+
+	return l
 }
 
 func GenA9K8T() LineCard {
