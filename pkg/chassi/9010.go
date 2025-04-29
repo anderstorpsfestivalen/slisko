@@ -48,9 +48,29 @@ func GenA9KRSP440SE() LineCard {
 
 	setManyPixelPositons(l.LEDs, []pixel.Position{
 
-		//Sync 0
+		// Sync 0
 		{X: 24, Y: 68, Size: 5},
-		{X: 24, Y: 78, Size: 5},
+		{X: 24, Y: 98, Size: 5},
+
+		// Sync 1
+		{X: 24, Y: 125, Size: 5},
+		{X: 24, Y: 150, Size: 5},
+
+		// SFP
+		{X: 57, Y: 187, Size: 5},
+		{X: 57, Y: 198, Size: 5},
+
+		//IEEE 1588
+		{X: 24, Y: 240, Size: 5},
+		{X: 24, Y: 265, Size: 5},
+
+		//MGMT LAN 0
+		{X: 24, Y: 582, Size: 5},
+		{X: 24, Y: 610, Size: 5},
+
+		//MGMT LAN 1
+		{X: 24, Y: 640, Size: 5},
+		{X: 24, Y: 665, Size: 5},
 	})
 
 	return l
