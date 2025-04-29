@@ -1,0 +1,10 @@
+# Cisco 7609
+
+LEDAmount = 132
+Linecards = ["6478", "6704", "blank", "6704", "sup720", "6704", "blank", "6704", "6478"]
+Patterns = [
+    "blink48ports",
+    "greenstatus",
+    "sup720", 
+    "x6704"
+]

@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -34,15 +33,15 @@ func main() {
 
 	log.Info("Started Slisko Controller")
 
-	ChassiDefinition, err := configuration.LoadFromFile("configurations/9010.toml")
+	def, err := configuration.LoadFromFile("configurations/9010.toml")
 	if err != nil {
 		log.Error(err)
 		panic(err)
 	}
 
-	fmt.Println(ChassiDefinition)
+	*numLeds = def.LEDAmount
 
-	c := chassi.New(chassi.CardsFromDefinition(ChassiDefinition.Linecards))
+	c := chassi.New(chassi.CardsFromDefinition(def.Linecards))
 
 	log.WithFields(log.Fields{
 		"linecards": c.GetCardOrder(),
@@ -51,13 +50,10 @@ func main() {
 
 	ctrl := controller.New(&c)
 	ctrl.Start(*fps)
-	ctrl.EnablePattern("blink48ports")
-	ctrl.EnablePattern("greenstatus")
-	ctrl.EnablePattern("x6704")
-	ctrl.EnablePattern("a9k-8t-l")
-	ctrl.EnablePattern("a9k-40ge-l")
-	ctrl.EnablePattern("static")
-	//ctrl.EnablePattern("mapper")
+
+	for _, p := range def.Patterns {
+		ctrl.EnablePattern(p)
+	}
 
 	api := api.New(&c, &ctrl)
 	go api.Start("0.0.0.0:3000")

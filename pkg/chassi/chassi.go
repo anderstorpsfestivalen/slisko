@@ -22,8 +22,13 @@ func CardsFromDefinition(s []string) []LineCard {
 			chassi = append(chassi, GenA9K40GE())
 		case "a9k-rsp400-se":
 			chassi = append(chassi, GenA9KRSP440SE())
+		case "6478":
+			chassi = append(chassi, Gen6478())
+		case "6704":
+			chassi = append(chassi, Gen6704())
+		case "sup720":
+			chassi = append(chassi, GenSUP720())
 		}
-
 	}
 	return chassi
 }

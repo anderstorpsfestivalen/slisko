@@ -24,6 +24,7 @@ func LoadFromFile(path string) (ChassiDefiniton, error) {
 }
 
 type ChassiDefiniton struct {
-	LEDAmount int
+	LEDAmount int64
 	Linecards []string
+	Patterns  []string
 }
