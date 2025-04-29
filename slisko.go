@@ -25,6 +25,7 @@ func main() {
 	flag.Bool("console", false, "Enables LED console op")
 	flag.Bool("spi", false, "Enables LED spi op")
 	flag.Bool("ddp", false, "Enables DDP output")
+	configurationFile := flag.String("config", "configurations/9010.toml", "configuration file")
 	ddpHost := flag.String("ddphost", "", "ddp host")
 	brightness := flag.Uint("brightness", 255, "override global brightness")
 	fps := flag.Int("fps", 60, "override the FPS")
@@ -33,7 +34,7 @@ func main() {
 
 	log.Info("Started Slisko Controller")
 
-	def, err := configuration.LoadFromFile("configurations/9010.toml")
+	def, err := configuration.LoadFromFile(*configurationFile)
 	if err != nil {
 		log.Error(err)
 		panic(err)
