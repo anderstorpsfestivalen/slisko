@@ -14,11 +14,8 @@ Linecards = [
     "a9k-40ge-l"
 ]
 Patterns = [
-    "blink48ports",
     "greenstatus",
-    "x6704",
     "a9k-8t-l",
     "a9k-40ge-l",
     "a9k-rsp400-se",
-    "static"
 ]

@@ -59,7 +59,9 @@ func (c *Chassi) getstatusLEDs() []*pixel.Pixel {
 	lp := []*pixel.Pixel{}
 	for _, lc := range c.LineCards {
 		if lc.Active {
-			lp = append(lp, lc.Status)
+			if lc.Status != nil {
+				lp = append(lp, lc.Status)
+			}
 		}
 	}
 	return lp
