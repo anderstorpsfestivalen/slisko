@@ -71,6 +71,19 @@ func GenA9KRSP440SE() LineCard {
 		//MGMT LAN 1
 		{X: 24, Y: 640, Size: 5},
 		{X: 24, Y: 665, Size: 5},
+
+		// 3x3 block
+		{X: 30, Y: 857, Size: 4},
+		{X: 43, Y: 857, Size: 4},
+		{X: 57, Y: 857, Size: 4},
+
+		{X: 30, Y: 880, Size: 4},
+		{X: 43, Y: 880, Size: 4},
+		{X: 57, Y: 880, Size: 4},
+
+		{X: 30, Y: 900, Size: 4},
+		{X: 43, Y: 900, Size: 4},
+		{X: 57, Y: 900, Size: 4},
 	})
 
 	return l
