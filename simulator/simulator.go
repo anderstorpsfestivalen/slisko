@@ -7,9 +7,9 @@ import (
 	_ "image/png"
 
 	"github.com/anderstorpsfestivalen/slisko/pkg/chassi"
-	"github.com/faiface/pixel"
-	"github.com/faiface/pixel/imdraw"
-	"github.com/faiface/pixel/pixelgl"
+	"github.com/gopxl/pixel/v2"
+	"github.com/gopxl/pixel/v2/backends/opengl"
+	"github.com/gopxl/pixel/v2/ext/imdraw"
 )
 
 type Simulator struct {
@@ -40,7 +40,7 @@ func New(c chassi.Chassi, width int, height int, trigger chan bool) Simulator {
 }
 
 func (s *Simulator) Start() {
-	pixelgl.Run(s.run)
+	opengl.Run(s.run)
 }
 
 func (s *Simulator) run() {
@@ -49,12 +49,12 @@ func (s *Simulator) run() {
 		panic(err)
 	}
 
-	cfg := pixelgl.WindowConfig{
+	cfg := opengl.WindowConfig{
 		Title:  "Slisko Simulator",
 		Bounds: pixel.R(0, 0, float64(s.width), float64(s.height)),
 		VSync:  true,
 	}
-	win, err := pixelgl.NewWindow(cfg)
+	win, err := opengl.NewWindow(cfg)
 	if err != nil {
 		panic(err)
 	}
@@ -100,7 +100,7 @@ func (s *Simulator) loadCardDefinitons([]chassi.LineCard) error {
 	return nil
 }
 
-func (s *Simulator) generateLEDs(w *pixelgl.Window) {
+func (s *Simulator) generateLEDs(w *opengl.Window) {
 
 	bounds := w.Bounds()
 	s.LEDs = s.LEDs[:0]
