@@ -8,3 +8,16 @@ Patterns = [
     "sup720", 
     "x6704"
 ]
+Mapping = [
+  { gen = 1 },
+  { card = 0 },
+  { gen = 1 },
+  { card = 8 },
+  { card = 7 },
+  { card = 5 },
+  { gen = 1 },
+  { card = 4 },
+  { card = 3 },
+  { gen = 1 },
+  { card = 1 }
+]

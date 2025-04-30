@@ -108,17 +108,14 @@ func main() {
 		panic(err)
 	}
 
-	// op.Map(output.GenEmpty(1))
-	// op.Map(c.LineCards[0].LEDs)
-	// op.Map(output.GenEmpty(1))
-	// op.Map(c.LineCards[8].LEDs)
-	// op.Map(c.LineCards[7].LEDs)
-	// op.Map(c.LineCards[5].LEDs)
-	// op.Map(output.GenEmpty(1))
-	// op.Map(c.LineCards[4].LEDs)
-	// op.Map(c.LineCards[3].LEDs)
-	// op.Map(output.GenEmpty(1))
-	// op.Map(c.LineCards[1].LEDs)
+	for _, m := range def.Mapping {
+		if m.IsGen() {
+			op.Map(output.GenEmpty(*m.Gen))
+		}
+		if m.IsCard() {
+			op.Map(c.LineCards[*m.Card].LEDs)
+		}
+	}
 
 	// Start output pump
 	go op.Run()

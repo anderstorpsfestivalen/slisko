@@ -27,4 +27,18 @@ type ChassiDefiniton struct {
 	LEDAmount int64
 	Linecards []string
 	Patterns  []string
+	Mapping   []MappingEntry `toml:"mapping"`
+}
+
+type MappingEntry struct {
+	Gen  *int `toml:"gen"`
+	Card *int `toml:"card"`
+}
+
+func (m *MappingEntry) IsGen() bool {
+	return m.Gen != nil
+}
+
+func (m *MappingEntry) IsCard() bool {
+	return m.Card != nil
 }
