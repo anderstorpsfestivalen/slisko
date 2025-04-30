@@ -11,14 +11,7 @@ Linecards = [
     "a9k-8t-l",
     "blank",
     "a9k-8t-l",
-    "a9k-40ge-l"
-]
-Patterns = [
-    "greenstatus",
-    "a9k-8t-l",
     "a9k-40ge-l",
-    "a9k-rsp400-se",
 ]
-Mapping = [
-
-]
+Patterns = ["greenstatus", "a9k-8t-l", "a9k-40ge-l", "a9k-rsp400-se"]
+Mapping = []
