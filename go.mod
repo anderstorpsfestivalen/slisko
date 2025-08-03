@@ -7,6 +7,7 @@ toolchain go1.24.2
 //replace github.com/coral/ddp => ../../coral/ddp
 
 require (
+	github.com/BurntSushi/toml v1.5.0
 	github.com/coral/ddp v0.2.0
 	github.com/gin-contrib/static v1.1.5
 	github.com/gin-gonic/contrib v0.0.0-20250113154928-93b827325fec
@@ -18,12 +19,10 @@ require (
 	github.com/sirupsen/logrus v1.9.3
 	periph.io/x/conn/v3 v3.7.2
 	periph.io/x/devices/v3 v3.7.4
-	periph.io/x/extra v0.0.0-20200225150845-c5a4b83ade91
 	periph.io/x/host/v3 v3.8.5
 )
 
 require (
-	github.com/BurntSushi/toml v1.5.0 // indirect
 	github.com/bytedance/sonic v1.13.2 // indirect
 	github.com/bytedance/sonic/loader v0.2.4 // indirect
 	github.com/cloudwego/base64x v0.1.5 // indirect
@@ -58,5 +57,4 @@ require (
 	golang.org/x/text v0.24.0 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	periph.io/x/periph v3.6.2+incompatible // indirect
 )

@@ -6,18 +6,21 @@ import (
 	"log"
 
 	"github.com/anderstorpsfestivalen/slisko/pkg/pixel"
-	"periph.io/x/extra/devices/screen"
+	"periph.io/x/devices/v3/screen1d"
 )
 
 type Console struct {
 	mapping       *[]*pixel.Pixel
 	renderTrigger chan bool
-	screen        *screen.Dev
+	screen        *screen1d.Dev
 	image         *image.NRGBA
 }
 
 func New(mapping *[]*pixel.Pixel, trigger chan bool) *Console {
-	scr := screen.New(len(*mapping))
+	opts := &screen1d.Opts{
+		X: len(*mapping),
+	}
+	scr := screen1d.New(opts)
 	return &Console{
 		mapping:       mapping,
 		renderTrigger: trigger,

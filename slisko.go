@@ -11,6 +11,7 @@ import (
 	"github.com/anderstorpsfestivalen/slisko/pkg/configuration"
 	"github.com/anderstorpsfestivalen/slisko/pkg/console"
 	"github.com/anderstorpsfestivalen/slisko/pkg/controller"
+	"github.com/anderstorpsfestivalen/slisko/pkg/gpio"
 	"github.com/anderstorpsfestivalen/slisko/pkg/output"
 	"github.com/anderstorpsfestivalen/slisko/pkg/output/apa102"
 	"github.com/anderstorpsfestivalen/slisko/pkg/output/null"
@@ -65,6 +66,15 @@ func main() {
 
 	api := api.New(&c, &ctrl)
 	go api.Start("0.0.0.0:3000")
+
+	if def.UsesButtons() {
+		buttons, err := gpio.NewGPIOController()
+		if err != nil {
+			log.Error(err)
+			panic(err)
+		}
+		buttons.Start()
+	}
 
 	var selectedDevice output.Device
 	// Null device to run program without outputs

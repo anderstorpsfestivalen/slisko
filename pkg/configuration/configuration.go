@@ -68,3 +68,7 @@ func (c *ChassiDefiniton) PrintWithSource(configFile string) error {
 	fmt.Printf("Configuration loaded from: %s\n\n", configFile)
 	return c.Print()
 }
+
+func (c *ChassiDefiniton) UsesButtons() bool {
+	return len(c.Buttons) > 0
+}
