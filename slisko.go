@@ -68,7 +68,7 @@ func main() {
 	go api.Start("0.0.0.0:3000")
 
 	if def.UsesButtons() {
-		buttons, err := gpio.NewGPIOController()
+		buttons, err := gpio.NewGPIOController(def.Buttons)
 		if err != nil {
 			log.Error(err)
 			panic(err)

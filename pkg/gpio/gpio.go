@@ -6,16 +6,16 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/anderstorpsfestivalen/slisko/pkg/configuration"
+	"periph.io/x/conn/v3/gpio"
+	"periph.io/x/conn/v3/gpio/gpioreg"
 	"periph.io/x/host/v3"
 )
 
 type GPIOController struct {
 }
 
-func NewGPIOController() (*GPIOController, error) {
-	if _, err := host.Init(); err != nil {
-		log.Fatal(err)
-	}
+func NewGPIOController(buttons []configuration.Button) (*GPIOController, error) {
 
 	isLinux := runtime.GOOS == "linux"
 	isRaspberryPi := false
@@ -41,9 +41,26 @@ func NewGPIOController() (*GPIOController, error) {
 		hasGPIO = true
 	}
 
+	// lets load the buttons
 	if isLinux && isRaspberryPi && hasGPIO {
 		//buttons := gpio.NewGPIOController()
 		//buttons.Start()
+		if _, err := host.Init(); err != nil {
+			if err != nil {
+				return nil, err
+			}
+		}
+		for _, button := range buttons {
+			p := gpioreg.ByName(button.Pin)
+			if p == nil {
+				panic("GPIO SETUP: Failed to find " + button.Pin)
+			}
+
+			if err := p.In(gpio.PullDown, gpio.BothEdges); err != nil {
+				log.Fatal(err)
+			}
+
+		}
 	}
 
 	return &GPIOController{}, nil

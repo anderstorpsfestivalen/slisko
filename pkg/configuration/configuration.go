@@ -34,7 +34,7 @@ type ChassiDefiniton struct {
 }
 
 type Button struct {
-	Pin    int    `toml:"pin"`
+	Pin    string `toml:"pin"`
 	Action string `toml:"action"`
 }
 
