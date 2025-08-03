@@ -1,6 +1,8 @@
 package configuration
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
 
 	"github.com/BurntSushi/toml"
@@ -28,6 +30,12 @@ type ChassiDefiniton struct {
 	Linecards []string
 	Patterns  []string
 	Mapping   []MappingEntry `toml:"mapping"`
+	Buttons   []Button       `toml:"buttons"`
+}
+
+type Button struct {
+	Pin    int    `toml:"pin"`
+	Action string `toml:"action"`
 }
 
 type MappingEntry struct {
@@ -41,4 +49,22 @@ func (m *MappingEntry) IsGen() bool {
 
 func (m *MappingEntry) IsCard() bool {
 	return m.Card != nil
+}
+
+// Print outputs the configuration in a formatted JSON format
+func (c *ChassiDefiniton) Print() error {
+	configJSON, err := json.MarshalIndent(c, "", "  ")
+	if err != nil {
+		fmt.Printf("Error formatting configuration: %v\n", err)
+		fmt.Printf("Raw configuration: %+v\n", c)
+		return err
+	}
+	fmt.Printf("%s\n", configJSON)
+	return nil
+}
+
+// PrintWithSource outputs the configuration with source file information
+func (c *ChassiDefiniton) PrintWithSource(configFile string) error {
+	fmt.Printf("Configuration loaded from: %s\n\n", configFile)
+	return c.Print()
 }

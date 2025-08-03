@@ -25,6 +25,7 @@ func main() {
 	flag.Bool("console", false, "Enables LED console op")
 	flag.Bool("spi", false, "Enables LED spi op")
 	flag.Bool("ddp", false, "Enables DDP output")
+	flag.Bool("print-config", false, "print the loaded configuration and exit")
 	configurationFile := flag.String("config", "configurations/9010.toml", "configuration file")
 	ddpHost := flag.String("ddphost", "", "ddp host")
 	brightness := flag.Uint("brightness", 255, "override global brightness")
@@ -38,6 +39,12 @@ func main() {
 	if err != nil {
 		log.Error(err)
 		panic(err)
+	}
+
+	// Print configuration and exit if requested
+	if isFlagPassed("print-config") {
+		def.PrintWithSource(*configurationFile)
+		os.Exit(0)
 	}
 
 	*numLeds = def.LEDAmount

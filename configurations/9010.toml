@@ -15,3 +15,9 @@ Linecards = [
 ]
 Patterns = ["greenstatus", "a9k-8t-l", "a9k-40ge-l", "a9k-rsp400-se"]
 Mapping = []
+Buttons = [
+    { pin = 23, action = "korv" },
+    { pin = 24, action = "korv" },
+    { pin = 25, action = "korv" },
+    { pin = 16, action = "korv" },
+]
