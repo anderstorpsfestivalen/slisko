@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/anderstorpsfestivalen/slisko/pkg/configuration"
+	"github.com/anderstorpsfestivalen/slisko/pkg/controller"
 	"periph.io/x/conn/v3/gpio"
 	"periph.io/x/conn/v3/gpio/gpioreg"
 	"periph.io/x/host/v3"
@@ -21,14 +22,16 @@ type GPIOController struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
+
+	controller *controller.Controller
 }
 
 type ActiveButton struct {
 	p     gpio.PinIO
-	Scene string
+	Scene []string
 }
 
-func NewGPIOController(buttons []configuration.Button) (*GPIOController, error) {
+func NewGPIOController(buttons []configuration.Button, co *controller.Controller) (*GPIOController, error) {
 
 	isLinux := runtime.GOOS == "linux"
 	isRaspberryPi := false
@@ -81,9 +84,10 @@ func NewGPIOController(buttons []configuration.Button) (*GPIOController, error) 
 
 		ctx, cancel := context.WithCancel(context.Background())
 		ctrl := &GPIOController{
-			ab:     ab,
-			ctx:    ctx,
-			cancel: cancel,
+			ab:         ab,
+			ctx:        ctx,
+			cancel:     cancel,
+			controller: co,
 		}
 
 		go ctrl.start()
@@ -145,22 +149,16 @@ func (c *GPIOController) monitorButton(button *ActiveButton) {
 	}
 }
 
-// onButtonPress handles the button press event
 func (c *GPIOController) onButtonPress(button *ActiveButton) {
-	// This function fires when a button is pressed
-	// You have access to the GPIOController instance (c) and the specific button
 
 	log.Printf("Executing action '%s' for button on pin %s", button.Scene, button.p)
 
-	// TODO: Add your button action logic here
-	// For example, you might want to trigger a scene change, pattern switch, etc.
-	// You can access other parts of your application through the controller instance
+	c.controller.ClearPatterns()
 
-	// Example of what you might do:
-	// - Switch LED patterns
-	// - Change scenes
-	// - Send API calls
-	// - Update application state
+	for _, p := range button.Scene {
+		c.controller.EnablePattern(p)
+	}
+
 }
 
 // Stop gracefully shuts down the GPIO controller

@@ -34,8 +34,8 @@ type ChassiDefiniton struct {
 }
 
 type Button struct {
-	Pin    string `toml:"pin"`
-	Action string `toml:"action"`
+	Pin    string   `toml:"pin"`
+	Action []string `toml:"action"`
 }
 
 type MappingEntry struct {

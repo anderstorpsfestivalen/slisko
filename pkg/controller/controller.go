@@ -138,6 +138,15 @@ func (ctrl *Controller) DisablePattern(p string) {
 	ctrl.Updates <- ctrl.GetPatternPerCategory()
 }
 
+func (ctrl *Controller) ClearPatterns() {
+	ctrl.activePatterns = nil
+	for _, l := range ctrl.c.LEDs {
+		l.SetColor(0.0, 0.0, 0.0)
+	}
+	log.Info("Cleared all patterns")
+	ctrl.Updates <- ctrl.GetPatternPerCategory()
+}
+
 func (ctrl *Controller) CheckIfActive(p string) bool {
 	for _, a := range ctrl.activePatterns {
 		if a.Info().Name == p {

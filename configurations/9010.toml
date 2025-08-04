@@ -16,8 +16,16 @@ Linecards = [
 Patterns = ["greenstatus", "a9k-8t-l", "a9k-40ge-l", "a9k-rsp400-se"]
 Mapping = []
 Buttons = [
-    { pin = "GPIO23", action = "korv" },
-    { pin = "GPIO24", action = "korv" },
-    { pin = "GPIO25", action = "korv" },
-    { pin = "GPIO16", action = "korv" },
+    { pin = "GPIO23", action = [
+        "greenstatus",
+        "a9k-8t-l",
+        "a9k-40ge-l",
+        "a9k-rsp400-se",
+    ] },
+    { pin = "GPIO24", action = [
+    ] },
+    { pin = "GPIO25", action = [
+    ] },
+    { pin = "GPIO16", action = [
+    ] },
 ]
