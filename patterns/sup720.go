@@ -1,7 +1,6 @@
 package patterns
 
 import (
-	"math/rand"
 	"time"
 
 	"github.com/anderstorpsfestivalen/slisko/pkg/chassi"
@@ -48,7 +47,6 @@ func (p *SUP720) Info() PatternInfo {
 }
 
 func (p *SUP720) Bootstrap(c *chassi.Chassi) {
-	rand.Seed(time.Now().UTC().UnixNano())
 	p.disk0 = faker.NewRandomInterval(40*time.Second,
 		12000*time.Second,
 		100*time.Millisecond,

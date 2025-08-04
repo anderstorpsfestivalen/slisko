@@ -36,7 +36,6 @@ func (p *A9K40GE) Info() PatternInfo {
 func (p *A9K40GE) Bootstrap(c *chassi.Chassi) {
 	for _, card := range c.GetCardOfType("A9K-40GE-L") {
 		for _, pb := range card.Link {
-			rand.Seed(time.Now().UTC().UnixNano())
 			time.Sleep(2 * time.Millisecond)
 			r := rand.Intn(100)
 			speed := true
