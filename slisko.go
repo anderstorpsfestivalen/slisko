@@ -26,6 +26,7 @@ func main() {
 	flag.Bool("console", false, "Enables LED console op")
 	flag.Bool("spi", false, "Enables LED spi op")
 	flag.Bool("ddp", false, "Enables DDP output")
+	flag.Bool("gpio", false, "Enables DDP output")
 	flag.Bool("print-config", false, "print the loaded configuration and exit")
 	configurationFile := flag.String("config", "configurations/9010.toml", "configuration file")
 	ddpHost := flag.String("ddphost", "", "ddp host")
@@ -67,11 +68,13 @@ func main() {
 	api := api.New(&c, &ctrl)
 	go api.Start("0.0.0.0:3000")
 
-	if def.UsesButtons() {
-		_, err := gpio.NewGPIOController(def.Buttons, &ctrl)
-		if err != nil {
-			log.Error(err)
-			panic(err)
+	if isFlagPassed("gpio") {
+		if def.UsesButtons() {
+			_, err := gpio.NewGPIOController(def.Buttons, &ctrl)
+			if err != nil {
+				log.Error(err)
+				panic(err)
+			}
 		}
 	}
 
