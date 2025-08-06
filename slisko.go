@@ -30,6 +30,7 @@ func main() {
 	flag.Bool("print-config", false, "print the loaded configuration and exit")
 	configurationFile := flag.String("config", "configurations/9010.toml", "configuration file")
 	ddpHost := flag.String("ddphost", "", "ddp host")
+	apiAddr := flag.String("api", "0.0.0.0:3000", "address for API server to listen on")
 	brightness := flag.Uint("brightness", 255, "override global brightness")
 	fps := flag.Int("fps", 60, "override the FPS")
 	numLeds := flag.Int64("leds", 132, "number of leds")
@@ -65,8 +66,11 @@ func main() {
 		ctrl.EnablePattern(p)
 	}
 
+	// ... (after flag.Parse())
+	// api := api.New(&c, &ctrl)
+	// go api.Start("0.0.0.0:3000")
 	api := api.New(&c, &ctrl)
-	go api.Start("0.0.0.0:3000")
+	go api.Start(*apiAddr)
 
 	if isFlagPassed("gpio") {
 		if def.UsesButtons() {
