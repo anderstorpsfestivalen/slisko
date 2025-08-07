@@ -33,17 +33,27 @@ func GenA9KRSP440SE() LineCard {
 		{X: 57, Y: 198, Size: 5},
 
 		// 3x3 block
-		{X: 30, Y: 857, Size: 4},
-		{X: 43, Y: 857, Size: 4},
+
+		// sso
 		{X: 57, Y: 857, Size: 4},
-
-		{X: 30, Y: 880, Size: 4},
-		{X: 43, Y: 880, Size: 4},
+		// fc_fault
 		{X: 57, Y: 880, Size: 4},
-
-		{X: 30, Y: 900, Size: 4},
-		{X: 43, Y: 900, Size: 4},
+		// gps
 		{X: 57, Y: 900, Size: 4},
+
+		// crit
+		{X: 43, Y: 857, Size: 4},
+		// maj
+		{X: 43, Y: 880, Size: 4},
+		// min
+		{X: 43, Y: 900, Size: 4},
+
+		// fail
+		{X: 30, Y: 857, Size: 4},
+		// aco
+		{X: 30, Y: 880, Size: 4},
+		// sync
+		{X: 30, Y: 900, Size: 4},
 	})
 
 	return l
@@ -68,7 +78,7 @@ func GenA9KRSP440SE2() LineCard {
 			"maj":      &leds[3],
 			"fc_fault": &leds[4],
 			"sync":     &leds[10],
-			"min":      &leds[7],
+			"min":      &leds[8],
 			"gps":      &leds[5],
 		},
 	}
@@ -80,17 +90,27 @@ func GenA9KRSP440SE2() LineCard {
 		{X: 57, Y: 198, Size: 5},
 
 		// 3x3 block
-		{X: 30, Y: 857, Size: 4},
-		{X: 43, Y: 857, Size: 4},
-		{X: 57, Y: 857, Size: 4},
 
-		{X: 30, Y: 880, Size: 4},
+		// sso
+		{X: 57, Y: 857, Size: 4},
+		// maj
 		{X: 43, Y: 880, Size: 4},
+		// fc_fault
 		{X: 57, Y: 880, Size: 4},
 
-		{X: 30, Y: 900, Size: 4},
-		{X: 43, Y: 900, Size: 4},
+		// gps
 		{X: 57, Y: 900, Size: 4},
+		// crit
+		{X: 43, Y: 857, Size: 4},
+		// aco
+		{X: 30, Y: 880, Size: 4},
+
+		// min
+		{X: 43, Y: 900, Size: 4},
+		// fail
+		{X: 30, Y: 857, Size: 4},
+		// sync
+		{X: 30, Y: 900, Size: 4},
 	})
 
 	return l

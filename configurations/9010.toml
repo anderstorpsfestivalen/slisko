@@ -23,8 +23,9 @@ Mapping = [
     { card = 7 },
     { card = 8 },
     { card = 9 },
-] # Patterns = ["greenstatus", "a9k-8t-l", "a9k-40ge-l", "a9k-rsp400-se"]
-Patterns = ["mapper"]
+]
+Patterns = ["greenstatus", "a9k-40ge-l", "a9k-8t-l", "a9k-rsp440-tr"]
+#Patterns = ["mapper"]
 Buttons = [
     { pin = "GPIO23", action = [
         "greenstatus",

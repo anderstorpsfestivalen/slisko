@@ -6,11 +6,13 @@ import (
 
 	"github.com/anderstorpsfestivalen/slisko/pkg/chassi"
 	"github.com/anderstorpsfestivalen/slisko/pkg/faker"
+	"github.com/anderstorpsfestivalen/slisko/pkg/pixel"
 	"github.com/anderstorpsfestivalen/slisko/pkg/utils"
 )
 
 type A9K40GE struct {
 	bport []ColorMap
+	dead  []*pixel.Pixel
 }
 
 func (p *A9K40GE) Render(info RenderInfo, c *chassi.Chassi) {
@@ -21,8 +23,15 @@ func (p *A9K40GE) Render(info RenderInfo, c *chassi.Chassi) {
 	//		}
 
 	for _, p := range p.bport {
-		v := utils.Invert(p.faker.Trig())
-		p.port.SetClamped(v*0.3, v*1.0, v*0.00)
+		if utils.Invert(p.faker.Trig()) == 1.0 {
+			p.port.SetClamped(0.3, 1.0, 0.00)
+		} else {
+			p.port.SetClamped(1.0, 0.6, 0.00)
+		}
+	}
+
+	for _, p := range p.dead {
+		p.SetClamped(1.0, 0.0, 0.0)
 	}
 }
 
@@ -34,26 +43,33 @@ func (p *A9K40GE) Info() PatternInfo {
 }
 
 func (p *A9K40GE) Bootstrap(c *chassi.Chassi) {
+
 	for _, card := range c.GetCardOfType("A9K-40GE-L") {
+
 		for _, pb := range card.Link {
+			chance := rand.Intn(15) == 0
 			time.Sleep(2 * time.Millisecond)
 			r := rand.Intn(100)
 			speed := true
 			if r > 80 {
 				speed = false
 			}
-			p.bport = append(p.bport,
-				ColorMap{
-					faker: faker.NewRandomInterval(
-						100*time.Millisecond,
-						7*time.Second,
-						100*time.Millisecond,
-						12*time.Second,
-						faker.NewRandomBlinker(15, 40, 1*time.Second, 10*time.Second),
-					),
-					speed: speed,
-					port:  pb,
-				})
+			if chance {
+				p.dead = append(p.dead, pb)
+			} else {
+				p.bport = append(p.bport,
+					ColorMap{
+						faker: faker.NewRandomInterval(
+							50*time.Millisecond,
+							7*time.Second,
+							50*time.Millisecond,
+							12*time.Second,
+							faker.NewRandomBlinker(15, 40, 1*time.Second, 10*time.Second),
+						),
+						speed: speed,
+						port:  pb,
+					})
+			}
 		}
 	}
 }

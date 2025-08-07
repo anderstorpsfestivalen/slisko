@@ -69,7 +69,8 @@ func (p *Mapper) Render(info RenderInfo, c *chassi.Chassi) {
 	{
 
 		v := c.GetCardOfType("A9K-RSP440-SE")[0]
-		v.Labeled["gps"].G = 1.0
+		v.LEDs[10].G = 1.0
+		//v.Labeled["gps"].G = 1.0
 
 	}
 

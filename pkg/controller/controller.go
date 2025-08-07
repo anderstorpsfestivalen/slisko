@@ -9,18 +9,19 @@ import (
 )
 
 var pt = map[string]patterns.Pattern{
-	"blink48ports": &patterns.Blink48Ports{},
-	"greenstatus":  &patterns.GreenStatus{},
-	"redstatus":    &patterns.RedStatus{},
-	"strobe":       &patterns.Strobe{},
-	"sup720":       &patterns.SUP720{},
-	"x6704":        &patterns.X6704{},
-	"colorcycler":  &patterns.Colorcycler{},
-	"snake":        &patterns.Snake{},
-	"mapper":       &patterns.Mapper{},
-	"a9k-8t-l":     &patterns.A9K8TL{},
-	"a9k-40ge-l":   &patterns.A9K40GE{},
-	"static":       &patterns.Static{},
+	"blink48ports":  &patterns.Blink48Ports{},
+	"greenstatus":   &patterns.GreenStatus{},
+	"redstatus":     &patterns.RedStatus{},
+	"strobe":        &patterns.Strobe{},
+	"sup720":        &patterns.SUP720{},
+	"x6704":         &patterns.X6704{},
+	"colorcycler":   &patterns.Colorcycler{},
+	"snake":         &patterns.Snake{},
+	"mapper":        &patterns.Mapper{},
+	"a9k-8t-l":      &patterns.A9K8TL{},
+	"a9k-40ge-l":    &patterns.A9K40GE{},
+	"a9k-rsp440-tr": &patterns.RSP440{},
+	"static":        &patterns.Static{},
 }
 
 type Controller struct {
