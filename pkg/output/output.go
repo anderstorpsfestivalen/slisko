@@ -18,7 +18,8 @@ type Output struct {
 	outputBuf []byte
 	lastBuf   []byte
 
-	device Device
+	device     Device
+	frameCount int64
 }
 
 func New(numPixels int64, device Device, trigger chan bool) (*Output, error) {
@@ -32,22 +33,27 @@ func New(numPixels int64, device Device, trigger chan bool) (*Output, error) {
 }
 
 func (a *Output) Run() {
+
 	for {
 		<-a.renderTrigger
 		for i, l := range a.mapping {
 			a.outputBuf[i*3] = pixel.Clamp255(l.R * 255)
 			a.outputBuf[i*3+1] = pixel.Clamp255(l.G * 255)
 			a.outputBuf[i*3+2] = pixel.Clamp255(l.B * 255)
-
 		}
 
-		if !bytes.Equal(a.outputBuf, a.lastBuf) {
+		a.frameCount++
+
+		if !bytes.Equal(a.outputBuf, a.lastBuf) || a.frameCount >= 60 {
 
 			a.device.Write(a.outputBuf)
 
 			a.lastBuf = append([]byte(nil), a.outputBuf...)
-		}
 
+			if a.frameCount >= 60 {
+				a.frameCount = 0
+			}
+		}
 	}
 }
 

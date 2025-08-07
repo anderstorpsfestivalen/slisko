@@ -174,7 +174,6 @@ func (ctrl *Controller) render() {
 			p.Render(info, ctrl.c)
 		}
 		ctrl.FrameBroker.Publish(true)
-
 		ctrl.frame = ctrl.frame + 1
 	}
 }

@@ -2,7 +2,6 @@ package wledapa
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/coral/ddp"
 )
@@ -52,8 +51,6 @@ func NewWLEDAPA(device *ddp.DDPController) *WLEDAPA {
 
 // TODO FIX LATER
 func (d *WLEDAPA) Write(pixels []byte) (int, error) {
-
-	fmt.Println("write")
 
 	if len(pixels)%3 != 0 || len(pixels) > len(pixels) {
 		return 0, errors.New("apa102: invalid RGB stream length")
