@@ -7,28 +7,24 @@ Linecards = [
     "blank",
     "a9k-8t-l",
     "a9k-rsp400-se",
-    "a9k-rsp400-se",
+    "a9k-rsp400-se-2",
     "a9k-8t-l",
     "blank",
     "a9k-8t-l",
     "a9k-40ge-l",
 ]
-# Patterns = ["greenstatus", "a9k-8t-l", "a9k-40ge-l", "a9k-rsp400-se"]
-Patterns = ["mapper"]
 Mapping = [
     { card = 0 },
-    { gen = 1},
     { card = 1 },
-    { gen = 1},
     { card = 3 },
     { card = 4 },
     { card = 5 },
-    { gen = 1},
     { card = 6 },
+    { card = 7 },
     { card = 8 },
-    { gen = 1},
     { card = 9 },
-]
+] # Patterns = ["greenstatus", "a9k-8t-l", "a9k-40ge-l", "a9k-rsp400-se"]
+Patterns = ["mapper"]
 Buttons = [
     { pin = "GPIO23", action = [
         "greenstatus",

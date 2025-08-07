@@ -4,7 +4,7 @@ import "github.com/anderstorpsfestivalen/slisko/pkg/pixel"
 
 func GenA9KRSP440SE() LineCard {
 
-	leds := make([]pixel.Pixel, 24)
+	leds := make([]pixel.Pixel, 11)
 
 	l := LineCard{
 		Name:   "A9K-RSP440-SE",
@@ -12,49 +12,72 @@ func GenA9KRSP440SE() LineCard {
 		Active: true,
 		LEDs:   leds,
 
-		Link: getSliceAddr(leds, 0, 12),
+		Link: getSliceAddr(leds, 0, 1),
 		Labeled: map[string]*pixel.Pixel{
-			"fail":     &leds[12],
-			"crit":     &leds[13],
-			"sso":      &leds[14],
-			"aco":      &leds[15],
-			"maj":      &leds[16],
-			"fc_fault": &leds[17],
-			"sync":     &leds[18],
-			"min":      &leds[19],
-			"gps":      &leds[20],
+			"fail":     &leds[8],
+			"crit":     &leds[5],
+			"sso":      &leds[2],
+			"aco":      &leds[9],
+			"maj":      &leds[6],
+			"fc_fault": &leds[3],
+			"sync":     &leds[10],
+			"min":      &leds[7],
+			"gps":      &leds[4],
 		},
 	}
 
-	for k, v := range getSliceMap(getSliceAddr(leds, 0, 12), "p") {
-		l.Labeled[k] = v
-	}
-
 	setManyPixelPositons(l.LEDs, []pixel.Position{
-
-		// Sync 0
-		{X: 24, Y: 68, Size: 5},
-		{X: 24, Y: 98, Size: 5},
-
-		// Sync 1
-		{X: 24, Y: 125, Size: 5},
-		{X: 24, Y: 150, Size: 5},
 
 		// SFP
 		{X: 57, Y: 187, Size: 5},
 		{X: 57, Y: 198, Size: 5},
 
-		//IEEE 1588
-		{X: 24, Y: 240, Size: 5},
-		{X: 24, Y: 265, Size: 5},
+		// 3x3 block
+		{X: 30, Y: 857, Size: 4},
+		{X: 43, Y: 857, Size: 4},
+		{X: 57, Y: 857, Size: 4},
 
-		//MGMT LAN 0
-		{X: 24, Y: 582, Size: 5},
-		{X: 24, Y: 610, Size: 5},
+		{X: 30, Y: 880, Size: 4},
+		{X: 43, Y: 880, Size: 4},
+		{X: 57, Y: 880, Size: 4},
 
-		//MGMT LAN 1
-		{X: 24, Y: 640, Size: 5},
-		{X: 24, Y: 665, Size: 5},
+		{X: 30, Y: 900, Size: 4},
+		{X: 43, Y: 900, Size: 4},
+		{X: 57, Y: 900, Size: 4},
+	})
+
+	return l
+}
+
+func GenA9KRSP440SE2() LineCard {
+
+	leds := make([]pixel.Pixel, 11)
+
+	l := LineCard{
+		Name:   "A9K-RSP440-SE-2",
+		Image:  "a9k-rsp440-se.png",
+		Active: true,
+		LEDs:   leds,
+
+		Link: getSliceAddr(leds, 0, 1),
+		Labeled: map[string]*pixel.Pixel{
+			"fail":     &leds[9],
+			"crit":     &leds[6],
+			"sso":      &leds[2],
+			"aco":      &leds[7],
+			"maj":      &leds[3],
+			"fc_fault": &leds[4],
+			"sync":     &leds[10],
+			"min":      &leds[7],
+			"gps":      &leds[5],
+		},
+	}
+
+	setManyPixelPositons(l.LEDs, []pixel.Position{
+
+		// SFP
+		{X: 57, Y: 187, Size: 5},
+		{X: 57, Y: 198, Size: 5},
 
 		// 3x3 block
 		{X: 30, Y: 857, Size: 4},
@@ -75,7 +98,7 @@ func GenA9KRSP440SE() LineCard {
 
 func GenA9K8T() LineCard {
 
-	leds := make([]pixel.Pixel, 10)
+	leds := make([]pixel.Pixel, 9)
 
 	l := LineCard{
 		Name:   "A9K-8T-L",
@@ -90,7 +113,7 @@ func GenA9K8T() LineCard {
 		},
 	}
 
-	for k, v := range getSliceMap(getSliceAddr(leds, 1, 10), "p") {
+	for k, v := range getSliceMap(getSliceAddr(leds, 1, 9), "p") {
 		l.Labeled[k] = v
 	}
 
@@ -124,22 +147,24 @@ func GenA9K40GE() LineCard {
 		Active: true,
 		LEDs:   leds,
 
-		Status: &leds[40],
-		Link:   getSliceAddr(leds, 0, 40),
+		Status: &leds[0],
+		Link:   getSliceAddr(leds, 1, 41),
 		Labeled: map[string]*pixel.Pixel{
-			"status": &leds[40],
+			"status": &leds[0],
 		},
 	}
 
-	for k, v := range getSliceMap(getSliceAddr(leds, 0, 40), "p") {
+	for k, v := range getSliceMap(getSliceAddr(leds, 1, 41), "p") {
 		l.Labeled[k] = v
 	}
 
 	setManyPixelPositons(l.LEDs, []pixel.Position{
+		// Status led
+		{X: 75, Y: 985, Size: 5},
+
 		// block of 10 leds
 		// between led: 21 px
 		// between groups of 2: 18 px
-
 		// Start 78
 		{X: 56, Y: 78, Size: 5},
 		{X: 56, Y: 99, Size: 5},
@@ -188,9 +213,6 @@ func GenA9K40GE() LineCard {
 		{X: 56, Y: 882, Size: 5},
 		{X: 56, Y: 900, Size: 5},
 		{X: 56, Y: 921, Size: 5},
-
-		// Status led
-		{X: 75, Y: 985, Size: 5},
 	})
 	return l
 }
