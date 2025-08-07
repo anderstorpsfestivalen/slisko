@@ -159,7 +159,7 @@ func (ctrl *Controller) CheckIfActive(p string) bool {
 func (ctrl *Controller) render() {
 	ctrl.ticker = time.NewTicker((1000 / time.Duration(ctrl.framerate)) * time.Millisecond)
 	for {
-		_ = <-ctrl.ticker.C
+		<-ctrl.ticker.C
 		info := patterns.RenderInfo{
 			Start: ctrl.start,
 			Frame: ctrl.frame,
