@@ -40,3 +40,13 @@ Buttons = [
     { pin = "GPIO16", action = [
     ] },
 ]
+
+# LED SEQUENCE
+# a9k40  0  41
+# 8k 41 50
+# 8k 50 59
+# rsp 69 70
+# rsp 70 81
+# 8k 81 90
+# 8k 90 99
+# a9k40 99 140
