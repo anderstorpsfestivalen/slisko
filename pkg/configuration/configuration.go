@@ -37,11 +37,34 @@ type ChassiDefiniton struct {
 	Mapping        []MappingEntry `toml:"mapping"`
 	Buttons        []Button       `toml:"buttons"`
 	TrafficShaper  *TrafficShaper `toml:"traffic_shaper,omitempty"`
+	Output         *Output        `toml:"output,omitempty"`
 }
 
 type Button struct {
 	Pin    string   `toml:"pin"`
 	Action []string `toml:"action"`
+}
+
+type Output struct {
+	DDP *DDPOutput `toml:"ddp,omitempty"`
+}
+
+type DDPOutput struct {
+	Host string `toml:"host"`
+	Port int    `toml:"port"`
+}
+
+// GetDDPAddress returns the full DDP address (host:port) or empty string if not configured
+func (o *Output) GetDDPAddress() string {
+	if o == nil || o.DDP == nil || o.DDP.Host == "" {
+		return ""
+	}
+	return fmt.Sprintf("%s:%d", o.DDP.Host, o.DDP.Port)
+}
+
+// HasDDP returns true if DDP output is configured
+func (o *Output) HasDDP() bool {
+	return o != nil && o.DDP != nil && o.DDP.Host != ""
 }
 
 type TrafficShaper struct {

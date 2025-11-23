@@ -50,6 +50,10 @@ low_end = 7
 peak_factor = 1.0
 low_factor = 0.2
 
+[output.ddp]
+host = "127.0.0.1"
+port = 4048
+
 # LED SEQUENCE
 # a9k40  0  41
 # 8k 41 50

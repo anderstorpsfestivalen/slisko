@@ -126,18 +126,56 @@ func main() {
 		selectedDevice = sl
 	}
 
+	// Determine if DDP should be enabled
+	// Priority: config file setting, overridden by --ddp=false flag
+	enableDDP := false
+	ddpAddress := ""
+
+	if def.Output != nil && def.Output.HasDDP() {
+		// DDP configured in file - enable by default
+		enableDDP = true
+		ddpAddress = def.Output.GetDDPAddress()
+		log.WithFields(log.Fields{
+			"address": ddpAddress,
+		}).Info("DDP output configured in config file")
+	}
+
+	// Check if --ddp flag was explicitly set to override
 	if isFlagPassed("ddp") {
+		// Flag was explicitly set
+		ddpFlagValue := flag.Lookup("ddp").Value.String() == "true"
+		if !ddpFlagValue {
+			// Explicitly disabled via --ddp=false
+			enableDDP = false
+			log.Info("DDP disabled via --ddp=false flag")
+		} else if ddpAddress == "" {
+			// Flag enabled but no config - use --ddphost flag
+			enableDDP = true
+			ddpAddress = *ddpHost
+			log.WithFields(log.Fields{
+				"address": ddpAddress,
+			}).Info("DDP enabled via --ddp flag")
+		}
+	}
+
+	if enableDDP && ddpAddress != "" {
 		ddpClient := ddp.NewDDPController()
 
-		err := ddpClient.ConnectUDP(*ddpHost)
+		err := ddpClient.ConnectUDP(ddpAddress)
 		if err != nil {
+			log.WithFields(log.Fields{
+				"address": ddpAddress,
+				"error":   err,
+			}).Error("Failed to connect to DDP host")
 			panic(err)
 		}
 
 		ww := wledapa.NewWLEDAPA(ddpClient)
-
 		selectedDevice = ww
 
+		log.WithFields(log.Fields{
+			"address": ddpAddress,
+		}).Info("DDP output enabled")
 	}
 
 	op, err := output.New(*numLeds, selectedDevice, ctrl.FrameBroker.Subscribe())
