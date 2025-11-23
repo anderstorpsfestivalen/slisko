@@ -131,12 +131,21 @@ func main() {
 		panic(err)
 	}
 
-	for _, m := range def.Mapping {
+	for i, m := range def.Mapping {
 		if m.IsGen() {
 			op.Map(output.GenEmpty(*m.Gen))
 		}
 		if m.IsCard() {
-			op.Map(c.LineCards[*m.Card].LEDs)
+			cardIdx := *m.Card
+			if cardIdx < 0 || cardIdx >= len(c.LineCards) {
+				log.WithFields(log.Fields{
+					"mapping_index": i,
+					"card_index":    cardIdx,
+					"num_linecards": len(c.LineCards),
+				}).Error("Card index out of bounds in mapping")
+				panic("Card index out of bounds - this should have been caught during config validation")
+			}
+			op.Map(c.LineCards[cardIdx].LEDs)
 		}
 	}
 

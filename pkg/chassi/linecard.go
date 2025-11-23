@@ -1,6 +1,7 @@
 package chassi
 
 import (
+	"fmt"
 	"strconv"
 
 	"github.com/anderstorpsfestivalen/slisko/pkg/pixel"
@@ -37,7 +38,14 @@ func getSliceMap(m []*pixel.Pixel, prefix string) map[string]*pixel.Pixel {
 }
 
 func setManyPixelPositons(pixels []pixel.Pixel, p []pixel.Position) {
+	// Bounds check to prevent panic
+	numPixels := len(pixels)
 	for i, pi := range p {
+		if i >= numPixels {
+			// Should never happen in production, but protects against bad linecard definitions
+			panic(fmt.Sprintf("setManyPixelPositons: position array has %d entries but pixel array only has %d entries (index %d out of bounds)",
+				len(p), numPixels, i))
+		}
 		pixels[i].SetPosition(pi.X, pi.Y, pi.Size)
 	}
 }
