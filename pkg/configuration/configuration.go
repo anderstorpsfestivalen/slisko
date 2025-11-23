@@ -31,16 +31,48 @@ func LoadFromFile(path string) (ChassiDefiniton, error) {
 }
 
 type ChassiDefiniton struct {
-	LEDAmount int64
-	Linecards []string
-	Patterns  []string
-	Mapping   []MappingEntry `toml:"mapping"`
-	Buttons   []Button       `toml:"buttons"`
+	LEDAmount      int64
+	Linecards      []string
+	Patterns       []string
+	Mapping        []MappingEntry `toml:"mapping"`
+	Buttons        []Button       `toml:"buttons"`
+	TrafficShaper  *TrafficShaper `toml:"traffic_shaper,omitempty"`
 }
 
 type Button struct {
 	Pin    string   `toml:"pin"`
 	Action []string `toml:"action"`
+}
+
+type TrafficShaper struct {
+	Enabled    bool    `toml:"enabled"`
+	PeakStart  int     `toml:"peak_start"`   // Hour of day (0-23), e.g., 17 for 5 PM
+	PeakEnd    int     `toml:"peak_end"`     // Hour of day (0-23), e.g., 22 for 10 PM
+	LowStart   int     `toml:"low_start"`    // Hour of day (0-23), e.g., 2 for 2 AM
+	LowEnd     int     `toml:"low_end"`      // Hour of day (0-23), e.g., 7 for 7 AM
+	PeakFactor float64 `toml:"peak_factor"`  // Multiplier during peak hours (1.0 = baseline/maximum as defined in styles)
+	LowFactor  float64 `toml:"low_factor"`   // Multiplier during low hours (0.0-1.0, e.g., 0.2 = 20% of peak)
+}
+
+// DefaultTrafficShaper returns a TrafficShaper with sensible defaults
+func DefaultTrafficShaper() *TrafficShaper {
+	return &TrafficShaper{
+		Enabled:    true,
+		PeakStart:  17, // 5 PM
+		PeakEnd:    22, // 10 PM
+		LowStart:   2,  // 2 AM
+		LowEnd:     7,  // 7 AM
+		PeakFactor: 1.0, // Peak is baseline (maximum blinking as defined in styles)
+		LowFactor:  0.2, // Low period is 20% of peak
+	}
+}
+
+// GetOrDefault returns the traffic shaper or a default one if not configured
+func (c *ChassiDefiniton) GetTrafficShaper() *TrafficShaper {
+	if c.TrafficShaper != nil {
+		return c.TrafficShaper
+	}
+	return DefaultTrafficShaper()
 }
 
 type MappingEntry struct {

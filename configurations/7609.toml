@@ -27,3 +27,12 @@ Mapping = [
     { card = 1 },
 ]
 Buttons = []
+
+[traffic_shaper]
+enabled = true
+peak_start = 17
+peak_end = 22
+low_start = 2
+low_end = 7
+peak_factor = 1.0
+low_factor = 0.2

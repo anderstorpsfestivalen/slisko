@@ -2,10 +2,12 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
 
+	"github.com/anderstorpsfestivalen/slisko/patterns"
 	"github.com/anderstorpsfestivalen/slisko/pkg/api"
 	"github.com/anderstorpsfestivalen/slisko/pkg/chassi"
 	"github.com/anderstorpsfestivalen/slisko/pkg/configuration"
@@ -16,6 +18,7 @@ import (
 	"github.com/anderstorpsfestivalen/slisko/pkg/output/apa102"
 	"github.com/anderstorpsfestivalen/slisko/pkg/output/null"
 	"github.com/anderstorpsfestivalen/slisko/pkg/output/wledapa"
+	"github.com/anderstorpsfestivalen/slisko/pkg/traffic"
 	"github.com/anderstorpsfestivalen/slisko/simulator"
 	"github.com/coral/ddp"
 	log "github.com/sirupsen/logrus"
@@ -51,6 +54,18 @@ func main() {
 	}
 
 	*numLeds = def.LEDAmount
+
+	// Initialize global traffic shaper from configuration
+	trafficShaper := traffic.NewShaper(def.GetTrafficShaper())
+	patterns.SetGlobalTrafficShaper(trafficShaper)
+
+	log.WithFields(log.Fields{
+		"enabled":     trafficShaper.GetIntensity(),
+		"peak_hours":  fmt.Sprintf("%d:00-%d:00", def.GetTrafficShaper().PeakStart, def.GetTrafficShaper().PeakEnd),
+		"low_hours":   fmt.Sprintf("%d:00-%d:00", def.GetTrafficShaper().LowStart, def.GetTrafficShaper().LowEnd),
+		"peak_factor": def.GetTrafficShaper().PeakFactor,
+		"low_factor":  def.GetTrafficShaper().LowFactor,
+	}).Info("Initialized traffic shaper")
 
 	c := chassi.New(chassi.CardsFromDefinition(def.Linecards))
 
