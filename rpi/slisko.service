@@ -1,0 +1,51 @@
+[Unit]
+Description=Slisko LED Controller
+Documentation=https://github.com/anderstorpsfestivalen/slisko
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+
+# Run as dedicated user
+User=slisko
+Group=slisko
+
+# Working directory contains configs and binary
+WorkingDirectory=/opt/slisko
+
+# Start the service with default config (can be overridden in /etc/default/slisko)
+ExecStart=/opt/slisko/slisko --config ${CONFIG_FILE:-configurations/9010.toml} --fps ${FPS:-60}
+
+# Environment file for overrides
+EnvironmentFile=-/etc/default/slisko
+
+# Restart on failure
+Restart=on-failure
+RestartSec=10
+StartLimitBurst=5
+StartLimitIntervalSec=300
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=slisko
+
+# Security hardening (relaxed for hardware access)
+NoNewPrivileges=true
+PrivateTmp=true
+# Note: ProtectSystem=strict would block /sys, which GPIO needs
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/opt/slisko
+
+# Device access for hardware output
+DeviceAllow=/dev/gpiomem rw
+DeviceAllow=/dev/spidev0.0 rw
+DevicePolicy=closed
+
+# Allow access to SPI and GPIO for hardware output
+SupplementaryGroups=spi gpio
+
+[Install]
+WantedBy=multi-user.target
