@@ -54,6 +54,13 @@ low_factor = 0.2
 host = "127.0.0.1"
 port = 4048
 
+[ledinfo]
+type = "WS2815"
+mapping = [
+    {gpio = 5, range = "0-100"},
+    {gpio = 7, range = "100-200"},
+]
+
 # LED SEQUENCE
 # a9k40  0  41
 # 8k 41 50

@@ -1,0 +1,10 @@
+# Roomier main task stack (we run networking + render setup on it).
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=24000
+
+# Ethernet via the internal ESP32 EMAC + an external RMII PHY (LAN8720).
+CONFIG_ETH_ENABLED=y
+CONFIG_ETH_USE_ESP32_EMAC=y
+CONFIG_ETH_PHY_INTERFACE_RMII=y
+
+# Use the GPIO0 input as the 50 MHz RMII reference clock (WT32-ETH01 wiring).
+CONFIG_ETH_RMII_CLK_INPUT=y

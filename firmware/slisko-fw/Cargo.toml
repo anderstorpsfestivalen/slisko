@@ -1,0 +1,44 @@
+# ESP32 firmware for the bong69 / WT32-ETH01 board. Targets xtensa-esp32-espidf
+# (esp-idf std). Standalone workspace (the empty [workspace] below) because it
+# is excluded from the host workspace at ../Cargo.toml.
+#
+# Dep versions are resolved with `cargo add` (latest), never hand-pinned.
+[package]
+name = "slisko-fw"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+resolver = "2"
+
+[workspace]
+
+[[bin]]
+name = "slisko-fw"
+harness = false
+
+[dependencies]
+esp-idf-hal = "0.46.2"
+esp-idf-svc = "0.52.1"
+log = "0.4.33"
+slisko-core = { path = "../slisko-core" }
+
+[build-dependencies]
+embuild = "0.33.1"
+
+# esp-idf builds are large; optimize even in dev to keep flash size/speed sane.
+[profile.dev]
+debug = true
+opt-level = "z"
+
+[profile.release]
+opt-level = "s"
+
+# Build the render core at opt-level 2 for per-frame math performance, while the
+# rest of the (large) tree stays size-optimized. NOTE: this is a perf choice,
+# NOT the fix for the Xtensa `[2 x float]` constant-pool isel error — that is
+# handled in slisko-core via `utils::bool_to_f32` (no opt-level avoids it).
+[profile.dev.package.slisko-core]
+opt-level = 2
+
+[profile.release.package.slisko-core]
+opt-level = 2

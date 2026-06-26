@@ -1,0 +1,18 @@
+# esp-idf (std) build config for ESP32 (Xtensa).
+[build]
+target = "xtensa-esp32-espidf"
+
+[target.xtensa-esp32-espidf]
+linker = "ldproxy"
+runner = "espflash flash --monitor"
+# espidf_time64: esp-idf v5.x uses 64-bit time_t.
+rustflags = ["--cfg", "espidf_time64"]
+
+[unstable]
+build-std = ["std", "panic_abort"]
+
+[env]
+MCU = "esp32"
+# ESP_IDF_VERSION is intentionally unset so esp-idf-sys uses the default that
+# matches the resolved esp-idf-svc version (avoids a hand-pinned mismatch).
+ESP_IDF_SDKCONFIG_DEFAULTS = "sdkconfig.defaults"

@@ -1,0 +1,19 @@
+# slisko firmware workspace
+#
+# `slisko-core` (no_std+alloc) holds the portable render engine — patterns,
+# chassi, fakers, traffic shaper — and compiles for both the host (the
+# `slisko-sim` desktop simulator) and the ESP32 firmware.
+#
+# `slisko-fw` is EXCLUDED from the default workspace build because it targets
+# xtensa-esp32 via esp-idf and will not compile for the host. Build it from its
+# own directory with the esp toolchain (see slisko-fw/README.md). Keeping it out
+# of `members` lets `cargo build`/`cargo test` at the workspace root work with a
+# plain stable toolchain.
+[workspace]
+resolver = "3"
+members = ["slisko-core", "slisko-sim"]
+exclude = ["slisko-fw"]
+
+[workspace.package]
+edition = "2024"
+license = "MIT"

@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 )
@@ -38,6 +40,41 @@ type ChassiDefiniton struct {
 	Buttons        []Button       `toml:"buttons"`
 	TrafficShaper  *TrafficShaper `toml:"traffic_shaper,omitempty"`
 	Output         *Output        `toml:"output,omitempty"`
+	LedInfo        *LedInfo       `toml:"ledinfo,omitempty"`
+}
+
+// LedInfo describes the physical LED hardware: the pixel chip type and the
+// mapping of GPIO data pins to contiguous pixel index ranges of the flattened
+// strand. It is consumed both by direct hardware output paths and by the
+// firmware "baker" (cmd/baker) that bakes a config onto an ESP32 board.
+type LedInfo struct {
+	// Type is the pixel chip, e.g. "WS2815", "WS2812", "WS2811", "APA102".
+	Type string `toml:"type"`
+	// Mapping assigns each data GPIO a contiguous range of the strand.
+	Mapping []LedOutput `toml:"mapping"`
+}
+
+// LedOutput maps a single data GPIO to a half-open pixel index range.
+type LedOutput struct {
+	Gpio  int    `toml:"gpio"`
+	Range string `toml:"range"` // "start-end", half-open [start, end)
+}
+
+// ParseRange parses the "start-end" range into half-open bounds [start, end).
+func (o LedOutput) ParseRange() (start int, end int, err error) {
+	parts := strings.SplitN(o.Range, "-", 2)
+	if len(parts) != 2 {
+		return 0, 0, fmt.Errorf("range %q must be in the form \"start-end\"", o.Range)
+	}
+	start, err = strconv.Atoi(strings.TrimSpace(parts[0]))
+	if err != nil {
+		return 0, 0, fmt.Errorf("range %q: invalid start: %w", o.Range, err)
+	}
+	end, err = strconv.Atoi(strings.TrimSpace(parts[1]))
+	if err != nil {
+		return 0, 0, fmt.Errorf("range %q: invalid end: %w", o.Range, err)
+	}
+	return start, end, nil
 }
 
 type Button struct {
@@ -141,6 +178,42 @@ func (c *ChassiDefiniton) Validate() error {
 	for i, mapping := range c.Mapping {
 		if err := validateMappingEntry(mapping, i, numLinecards); err != nil {
 			return err
+		}
+	}
+
+	// Validate LED hardware info
+	if c.LedInfo != nil {
+		if err := c.LedInfo.validate(c.LEDAmount); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// validate checks the LED type is set and every output range is well-formed,
+// non-empty, ascending, and within [0, ledAmount].
+func (l *LedInfo) validate(ledAmount int64) error {
+	if strings.TrimSpace(l.Type) == "" {
+		return fmt.Errorf("ledinfo: type must be set (e.g. \"WS2815\", \"APA102\")")
+	}
+
+	for i, out := range l.Mapping {
+		start, end, err := out.ParseRange()
+		if err != nil {
+			return fmt.Errorf("ledinfo.mapping[%d]: %w", i, err)
+		}
+		if out.Gpio < 0 {
+			return fmt.Errorf("ledinfo.mapping[%d]: gpio %d is negative", i, out.Gpio)
+		}
+		if start < 0 {
+			return fmt.Errorf("ledinfo.mapping[%d]: range start %d is negative", i, start)
+		}
+		if end <= start {
+			return fmt.Errorf("ledinfo.mapping[%d]: range %q is empty or descending (end must be > start)", i, out.Range)
+		}
+		if int64(end) > ledAmount {
+			return fmt.Errorf("ledinfo.mapping[%d]: range end %d exceeds LEDAmount %d", i, end, ledAmount)
 		}
 	}
 
