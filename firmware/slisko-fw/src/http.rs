@@ -115,10 +115,10 @@ fn patterns_json(ctrl: &Shared) -> String {
 fn query_param(uri: &str, key: &str) -> Option<String> {
     let q = uri.split_once('?')?.1;
     for pair in q.split('&') {
-        if let Some((k, v)) = pair.split_once('=') {
-            if k == key {
-                return Some(v.to_string());
-            }
+        if let Some((k, v)) = pair.split_once('=')
+            && k == key
+        {
+            return Some(v.to_string());
         }
     }
     None

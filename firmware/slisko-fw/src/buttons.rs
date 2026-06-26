@@ -48,7 +48,7 @@ fn run(mut header_pins: Vec<(u8, AnyInputPin<'static>)>, ctrl: Shared) {
         };
         let (gpio, pin) = header_pins.remove(pos);
         // 34/35/36 are input-only (no internal pull) — they need an external one.
-        let pull = if matches!(gpio, 34 | 35 | 36) {
+        let pull = if matches!(gpio, 34..=36) {
             Pull::Floating
         } else {
             Pull::Up

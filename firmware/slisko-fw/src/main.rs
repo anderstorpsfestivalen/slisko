@@ -164,15 +164,15 @@ fn main() -> Result<(), EspError> {
         let now = (unsafe { esp_timer_get_time() } - start_us) as f32 / 1_000_000.0;
 
         // Once a second, refresh the shaper hour from SNTP (if synced).
-        if let Some(ts) = &timesync {
-            if ts.synced() {
-                if !sntp_logged {
-                    info!("sntp synced; hour-of-day = {:.2}", time::hour_of_day());
-                    sntp_logged = true;
-                }
-                if let Ok(mut c) = ctrl.lock() {
-                    c.set_hour(time::hour_of_day());
-                }
+        if let Some(ts) = &timesync
+            && ts.synced()
+        {
+            if !sntp_logged {
+                info!("sntp synced; hour-of-day = {:.2}", time::hour_of_day());
+                sntp_logged = true;
+            }
+            if let Ok(mut c) = ctrl.lock() {
+                c.set_hour(time::hour_of_day());
             }
         }
 

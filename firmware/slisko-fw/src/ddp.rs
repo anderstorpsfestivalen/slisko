@@ -3,21 +3,22 @@
 //! Lets an external controller (xLights, Falcon, or slisko-on-RPI via `--ddp`)
 //! override the internal patterns: a UDP listener on port 4048 fills a shared
 //! RGB buffer, and when DDP mode is active the render loop paints that buffer
-//! instead of ticking patterns. DDP packet = 10-byte header + RGB data, with a
-//! 32-bit byte offset and 16-bit length (both big-endian).
+//! instead of ticking patterns. Packet parsing is delegated to `ddp-rs`'
+//! allocation-free `PacketRef`, which handles both the 10-byte and 14-byte
+//! (timecode) header variants and exposes the byte offset / length / payload.
 
 use std::net::UdpSocket;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use ddp_rs::packet::PacketRef;
 use esp_idf_svc::sys::esp_timer_get_time;
 use log::{info, warn};
 
 use slisko_core::pixel::Pixel;
 
 pub const DDP_PORT: u16 = 4048;
-const HEADER_LEN: usize = 10;
 /// If no DDP frame arrives within this window, fall back to internal patterns.
 const STALE_US: i64 = 2_000_000;
 
@@ -106,15 +107,14 @@ fn run(state: Arc<DdpState>) {
         info!("ddp: listening on udp/{DDP_PORT}");
         loop {
             match sock.recv(&mut packet) {
-                Ok(n) if n > HEADER_LEN => {
-                    // offset: bytes 4..8 (BE), length: bytes 8..10 (BE).
-                    let offset =
-                        u32::from_be_bytes([packet[4], packet[5], packet[6], packet[7]]) as usize;
-                    let len = u16::from_be_bytes([packet[8], packet[9]]) as usize;
-                    let avail = (n - HEADER_LEN).min(len);
-                    state.ingest(offset, &packet[HEADER_LEN..HEADER_LEN + avail]);
+                Ok(n) => {
+                    // `PacketRef` parses the header (10- or 14-byte) and borrows
+                    // the payload; the offset is a byte offset into the strand.
+                    if let Some(p) = PacketRef::from_bytes(&packet[..n]) {
+                        let avail = (p.header.length as usize).min(p.data.len());
+                        state.ingest(p.header.offset as usize, &p.data[..avail]);
+                    }
                 }
-                Ok(_) => {}
                 Err(e) => {
                     warn!("ddp: recv error ({e}); rebinding");
                     break;
