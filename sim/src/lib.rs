@@ -322,7 +322,7 @@ impl Simulator {
     fn apply_frame(&mut self, frame: Option<Vec<u8>>) -> GameResult {
         if let Some(frame) = frame {
             self.strand_map
-                .apply_rgb(&frame, &mut self.chassi.leds)
+                .apply_srgb8(&frame, &mut self.chassi.leds)
                 .map_err(|error| GameError::RenderError(error.to_string()))?;
         }
         Ok(())

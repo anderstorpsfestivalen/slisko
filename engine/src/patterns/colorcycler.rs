@@ -69,6 +69,7 @@ mod tests {
         p.render(
             &RenderInfo {
                 secs: 0.0,
+                millis: 0,
                 frame: 0,
             },
             &mut c,

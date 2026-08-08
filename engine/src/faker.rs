@@ -2,8 +2,9 @@
 //!
 //! The Go fakers hold a `time.Time` start and call `time.Since(st)`, and pull
 //! randomness from the global `math/rand`. Here every faker is driven by an
-//! explicit elapsed-seconds clock (`trig(now)`), and the randomized ones own a
-//! seeded [`Rng`] so rendering needs no shared RNG. Durations are `f32` seconds.
+//! explicit elapsed-millisecond clock (`trig(now)`), and the randomized ones
+//! own a seeded [`Rng`] so rendering needs no shared RNG. Runtime deadlines use
+//! wrapping `u32` milliseconds; configured duration ranges remain seconds.
 
 use alloc::boxed::Box;
 
@@ -29,6 +30,11 @@ impl Rng {
         self.range_f32(min, max)
     }
 
+    /// Uniform duration in whole milliseconds, sampled from a seconds range.
+    pub fn range_millis(&mut self, min_secs: f32, max_secs: f32) -> u32 {
+        (self.range_secs(min_secs, max_secs) * 1_000.0) as u32
+    }
+
     /// Spawn a fresh seed for a child faker so each gets an independent stream.
     pub fn next_seed(&mut self) -> u64 {
         let hi = self.0.rand_u32() as u64;
@@ -39,33 +45,34 @@ impl Rng {
 
 /// Equivalent of the Go `Fake` interface.
 pub trait Fake {
-    /// Current value in `[0, 1]` at elapsed time `now` (seconds).
-    fn trig(&mut self, now: f32) -> f32;
+    /// Current value in `[0, 1]` at wrapping elapsed time `now` (milliseconds).
+    fn trig(&mut self, now: u32) -> f32;
 }
 
 /// `Blinker`: a square wave of a sine (mirrors `faker.Blinker`).
 pub struct Blinker {
-    st: f32,
+    st: u32,
     speed: f32,
 }
 
 impl Blinker {
-    pub fn new(speed: f32, now: f32) -> Self {
+    pub fn new(speed: f32, now: u32) -> Self {
         Blinker { st: now, speed }
     }
 }
 
 impl Fake for Blinker {
-    fn trig(&mut self, now: f32) -> f32 {
-        utils::square(libm::sinf(self.speed * (now - self.st)))
+    fn trig(&mut self, now: u32) -> f32 {
+        let elapsed_secs = now.wrapping_sub(self.st) as f32 * 0.001;
+        utils::square_sine_phase(self.speed * elapsed_secs)
     }
 }
 
 /// `RandomBlinker`: a sine whose speed re-randomizes on a random interval; the
 /// output is a `DutyCycle` of that sine (mirrors `faker.RandomBlinker`).
 pub struct RandomBlinker {
-    st: f32,
-    iv: f32,
+    st: u32,
+    iv: u32,
     speed: f32,
     min_speed: f32,
     max_speed: f32,
@@ -80,10 +87,10 @@ impl RandomBlinker {
         max_speed: f32,
         min_time: f32,
         max_time: f32,
-        now: f32,
+        now: u32,
         mut rng: Rng,
     ) -> Self {
-        let iv = rng.range_secs(min_time, max_time);
+        let iv = rng.range_millis(min_time, max_time);
         let speed = rng.range_f32(min_speed, max_speed);
         RandomBlinker {
             st: now,
@@ -99,13 +106,15 @@ impl RandomBlinker {
 }
 
 impl Fake for RandomBlinker {
-    fn trig(&mut self, now: f32) -> f32 {
-        if now - self.st > self.iv {
-            self.iv = self.rng.range_secs(self.min_time, self.max_time);
+    fn trig(&mut self, now: u32) -> f32 {
+        let mut elapsed = now.wrapping_sub(self.st);
+        if elapsed > self.iv {
+            self.iv = self.rng.range_millis(self.min_time, self.max_time);
             self.speed = self.rng.range_f32(self.min_speed, self.max_speed);
             self.st = now;
+            elapsed = 0;
         }
-        utils::duty_cycle(libm::sinf(self.speed * (now - self.st)), 0.80)
+        utils::duty_80_sine_phase(self.speed * elapsed as f32 * 0.001)
     }
 }
 
@@ -113,9 +122,9 @@ impl Fake for RandomBlinker {
 /// `faker.RandomInterval`).
 pub struct RandomInterval {
     blink: Box<dyn Fake + Send>,
-    st: f32,
-    iv: f32,
-    bl: f32,
+    st: u32,
+    iv: u32,
+    bl: u32,
     min_interval: f32,
     max_interval: f32,
     min_blink: f32,
@@ -130,11 +139,11 @@ impl RandomInterval {
         min_b: f32,
         max_b: f32,
         blink: Box<dyn Fake + Send>,
-        now: f32,
+        now: u32,
         mut rng: Rng,
     ) -> Self {
-        let iv = rng.range_secs(min_i, max_i);
-        let bl = rng.range_secs(min_b, max_b);
+        let iv = rng.range_millis(min_i, max_i);
+        let bl = rng.range_millis(min_b, max_b);
         RandomInterval {
             blink,
             st: now,
@@ -150,13 +159,15 @@ impl RandomInterval {
 }
 
 impl Fake for RandomInterval {
-    fn trig(&mut self, now: f32) -> f32 {
-        if now - self.st > self.iv + self.bl {
-            self.iv = self.rng.range_secs(self.min_interval, self.max_interval);
-            self.bl = self.rng.range_secs(self.min_blink, self.max_blink);
+    fn trig(&mut self, now: u32) -> f32 {
+        let mut elapsed = now.wrapping_sub(self.st);
+        if elapsed > self.iv + self.bl {
+            self.iv = self.rng.range_millis(self.min_interval, self.max_interval);
+            self.bl = self.rng.range_millis(self.min_blink, self.max_blink);
             self.st = now;
+            elapsed = 0;
         }
-        if now - self.st > self.iv {
+        if elapsed > self.iv {
             return self.blink.trig(now);
         }
         0.0
@@ -169,29 +180,40 @@ mod tests {
 
     #[test]
     fn blinker_is_bounded() {
-        let mut b = Blinker::new(2.0, 0.0);
+        let mut b = Blinker::new(2.0, 0);
         for i in 0..100 {
-            let v = b.trig(i as f32 * 0.05);
+            let v = b.trig(i * 50);
             assert!(v == 0.0 || v == 1.0);
         }
     }
 
     #[test]
     fn random_blinker_stays_in_unit_range() {
-        let mut b = RandomBlinker::new(15.0, 40.0, 1.0, 10.0, 0.0, Rng::new(42));
+        let mut b = RandomBlinker::new(15.0, 40.0, 1.0, 10.0, 0, Rng::new(42));
         for i in 0..200 {
-            let v = b.trig(i as f32 * 0.1);
+            let v = b.trig(i * 100);
             assert!((0.0..=1.0).contains(&v));
         }
     }
 
     #[test]
     fn random_interval_gates_inner() {
-        let inner = Box::new(Blinker::new(20.0, 0.0));
-        let mut ri = RandomInterval::new(0.05, 7.0, 0.05, 12.0, inner, 0.0, Rng::new(7));
+        let inner = Box::new(Blinker::new(20.0, 0));
+        let mut ri = RandomInterval::new(0.05, 7.0, 0.05, 12.0, inner, 0, Rng::new(7));
         for i in 0..200 {
-            let v = ri.trig(i as f32 * 0.05);
+            let v = ri.trig(i * 50);
             assert!((0.0..=1.0).contains(&v));
+        }
+    }
+
+    #[test]
+    fn interval_timing_survives_u32_millisecond_wrap() {
+        let start = u32::MAX - 100;
+        let inner = Box::new(Blinker::new(20.0, start));
+        let mut ri = RandomInterval::new(0.05, 0.06, 0.05, 0.06, inner, start, Rng::new(7));
+        for offset in (0..1_000).step_by(10) {
+            let value = ri.trig(start.wrapping_add(offset));
+            assert!((0.0..=1.0).contains(&value));
         }
     }
 }

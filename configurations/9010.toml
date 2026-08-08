@@ -57,8 +57,8 @@ port = 4048
 [ledinfo]
 type = "WS2815"
 mapping = [
-    {gpio = 5, range = "0-100"},
-    {gpio = 7, range = "100-200"},
+    {data = 5, range = "0-100"},
+    {data = 7, range = "100-200"},
 ]
 
 # LED SEQUENCE

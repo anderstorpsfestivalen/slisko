@@ -4,11 +4,35 @@
 //! configuration into Rust source in Cargo's `OUT_DIR`.
 #![no_std]
 
+use engine::output::{Apa102Options, Ws281xType};
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct LedOutput {
-    pub gpio: u8,
-    pub start: usize,
-    pub end: usize,
+pub enum LedDriver {
+    Ws281x(Ws281xType),
+    Apa102(Apa102Options),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LedOutput {
+    Ws281x {
+        data: u8,
+        start: usize,
+        end: usize,
+    },
+    Apa102 {
+        clock: u8,
+        data: u8,
+        start: usize,
+        end: usize,
+    },
+}
+
+impl LedOutput {
+    pub const fn range(&self) -> (usize, usize) {
+        match *self {
+            Self::Ws281x { start, end, .. } | Self::Apa102 { start, end, .. } => (start, end),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -35,10 +59,9 @@ mod tests {
         let chassi = Chassi::from_specs(CHASSIS);
         let map = StrandMap::new(&chassi, OUTPUT_MAPPING, LED_COUNT).unwrap();
         assert_eq!(map.len(), LED_COUNT);
-        assert!(
-            LED_OUTPUTS
-                .iter()
-                .all(|output| output.start < output.end && output.end <= LED_COUNT)
-        );
+        assert!(LED_OUTPUTS.iter().all(|output| {
+            let (start, end) = output.range();
+            start < end && end <= LED_COUNT
+        }));
     }
 }

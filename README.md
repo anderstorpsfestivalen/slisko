@@ -62,9 +62,9 @@ See [INSTALL.md](INSTALL.md) for ESP32 setup and flashing.
 
 ## Known hardware and parity gaps
 
-- APA102 encoding exists, but the ESP firmware does not yet select and drive
-  the SPI transport. The 7609 config therefore works for host simulation but is
-  not ready for this ESP32 firmware target.
+- APA102 uses the ESP32's two user SPI hosts (SPI2, then SPI3), so at most two
+  independent clock/data chains can be configured. Shared-clock/multi-data
+  output is not implemented.
 - The 9010 GPIO and button assignments do not match the hard-coded bong69 board
   pin map. Board identity needs to become configuration data before validating
   those pins generically.

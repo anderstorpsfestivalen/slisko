@@ -64,7 +64,7 @@ mod tests {
         p.bootstrap(&c, &mut ctx);
         p.render(&RenderInfo::default(), &mut c);
         for px in &c.leds {
-            assert_eq!(px.to_rgb8(), [255, 127, 127]);
+            assert_eq!(px.to_srgb8(), [255, 127, 127]);
         }
     }
 }

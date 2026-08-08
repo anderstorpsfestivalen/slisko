@@ -22,6 +22,9 @@ pub struct PatternInfo {
 pub struct RenderInfo {
     /// Seconds since the controller started.
     pub secs: f32,
+    /// Wrapping whole milliseconds since the controller started. Deadline and
+    /// interval logic uses this so it remains precise after long uptimes.
+    pub millis: u32,
     /// Monotonic frame counter.
     pub frame: i64,
 }

@@ -5,7 +5,7 @@
 //! directly (`secs: f32`) so the same code drives the firmware (`esp_timer`)
 //! and the host simulator without any clock dependency.
 
-use libm::{cosf, fabsf, fmodf, powf, sinf};
+use crate::math;
 
 /// Branchless `0.0`/`1.0` from a bool, computed in the integer domain and
 /// bit-cast to `f32`.
@@ -20,6 +20,35 @@ use libm::{cosf, fabsf, fmodf, powf, sinf};
 #[inline]
 fn bool_to_f32(c: bool) -> f32 {
     f32::from_bits(core::hint::black_box(0x3f80_0000u32) * c as u32)
+}
+
+/// Reduce the non-negative, bounded phases used by the blink fakers to one
+/// turn. `RandomBlinker` resets its phase at least every ten seconds, so its
+/// maximum configured phase is 400 radians. The integer conversion therefore
+/// stays exact and avoids a software `sinf` call for every live port.
+#[inline]
+fn blink_phase_radians(phase: f32) -> f32 {
+    const INV_TAU: f32 = 1.0 / core::f32::consts::TAU;
+    let turns = (phase * INV_TAU) as u32;
+    phase - turns as f32 * core::f32::consts::TAU
+}
+
+/// Square wave equivalent to `square(sinf(phase))` for a blink-faker phase.
+#[inline]
+pub(crate) fn square_sine_phase(phase: f32) -> f32 {
+    let phase = blink_phase_radians(phase);
+    bool_to_f32(phase > 0.0 && phase < core::f32::consts::PI)
+}
+
+/// Equivalent to `duty_cycle(sinf(phase), 0.8)` for a blink-faker phase.
+#[inline]
+pub(crate) fn duty_80_sine_phase(phase: f32) -> f32 {
+    // duty_cycle(v, 0.8) is on when v > 0.6. asin(0.6) gives the two
+    // transition points in the positive half of a sine period.
+    const START: f32 = 0.643_501_1;
+    const END: f32 = core::f32::consts::PI - START;
+    let phase = blink_phase_radians(phase);
+    bool_to_f32(phase > START && phase < END)
 }
 
 // ---- pure value helpers (utils.go) ----
@@ -58,32 +87,32 @@ pub fn invert(v: f32) -> f32 {
 
 /// `SinFull`: raw sine in `[-1, 1]`.
 pub fn sin_full(secs: f32, speed: f32) -> f32 {
-    sinf(speed * secs)
+    math::sinf(speed * secs)
 }
 
 /// `CosFull`: raw cosine in `[-1, 1]`.
 pub fn cos_full(secs: f32, speed: f32) -> f32 {
-    cosf(speed * secs)
+    math::cosf(speed * secs)
 }
 
 /// `Sin`: sine normalized to `[0, 1]`.
 pub fn sin(secs: f32, speed: f32) -> f32 {
-    (sinf(speed * secs) + 1.0) / 2.0
+    (math::sinf(speed * secs) + 1.0) * 0.5
 }
 
 /// `Cos`: cosine normalized to `[0, 1]`.
 pub fn cos(secs: f32, speed: f32) -> f32 {
-    (cosf(speed * secs) + 1.0) / 2.0
+    (math::cosf(speed * secs) + 1.0) * 0.5
 }
 
 /// `Triangle`: `|(secs mod period) - amplitude|`.
 pub fn triangle(secs: f32, period: f32, amplitude: f32) -> f32 {
-    fabsf(fmodf(secs, period) - amplitude)
+    math::fabsf(math::fmodf(secs, period) - amplitude)
 }
 
 /// `CurlyTriangle`: `triangle` raised to `curl`.
 pub fn curly_triangle(secs: f32, period: f32, amplitude: f32, curl: f32) -> f32 {
-    powf(fabsf(fmodf(secs, period) - amplitude), curl)
+    math::powf(math::fabsf(math::fmodf(secs, period) - amplitude), curl)
 }
 
 #[cfg(test)]
@@ -118,5 +147,19 @@ mod tests {
     fn triangle_matches_go_formula() {
         // |(2.5 mod 2.0) - 1.0| = |0.5 - 1.0| = 0.5
         assert!((triangle(2.5, 2.0, 1.0) - 0.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn binary_phase_helpers_match_sine_away_from_transitions() {
+        for step in 0..=40_000 {
+            let phase = step as f32 * 0.01;
+            let sine = libm::sinf(phase);
+            if sine.abs() > 0.000_1 {
+                assert_eq!(square_sine_phase(phase), square(sine));
+            }
+            if (sine - 0.6).abs() > 0.000_1 {
+                assert_eq!(duty_80_sine_phase(phase), duty_cycle(sine, 0.8));
+            }
+        }
     }
 }

@@ -158,11 +158,28 @@ impl Controller {
         }
     }
 
-    /// Render one frame at elapsed `now` seconds. Globals render first so other
-    /// patterns paint on top (mirrors the Go render order).
+    /// Render one frame at elapsed `now` seconds. Native callers that already
+    /// have a higher-resolution integer clock should use [`Self::tick_micros`].
     pub fn tick(&mut self, now: f32) {
+        self.render_tick(now, (now.max(0.0) * 1_000.0) as u32);
+    }
+
+    /// Render one frame from an integer elapsed-microsecond clock. Pattern
+    /// waves retain their `f32` seconds, while the many faker deadline checks
+    /// use precise wrapping integer milliseconds.
+    pub fn tick_micros(&mut self, elapsed_micros: u64) {
+        self.render_tick(
+            elapsed_micros as f32 / 1_000_000.0,
+            (elapsed_micros / 1_000) as u32,
+        );
+    }
+
+    /// Globals render first so other patterns paint on top (mirrors the Go
+    /// render order).
+    fn render_tick(&mut self, now_secs: f32, now_millis: u32) {
         let info = RenderInfo {
-            secs: now,
+            secs: now_secs,
+            millis: now_millis,
             frame: self.frame,
         };
         // SAFETY-of-borrows: split the &mut self borrow — patterns need &mut

@@ -26,14 +26,14 @@ fn standard_faker(
     max_b: f32,
     ctx: &mut BootstrapCtx,
 ) -> Box<dyn Fake + Send> {
-    let blinker = RandomBlinker::new(15.0, 40.0, 1.0, 10.0, 0.0, Rng::new(ctx.rng.next_seed()));
+    let blinker = RandomBlinker::new(15.0, 40.0, 1.0, 10.0, 0, Rng::new(ctx.rng.next_seed()));
     Box::new(RandomInterval::new(
         min_i,
         max_i,
         min_b,
         max_b,
         Box::new(blinker),
-        0.0,
+        0,
         Rng::new(ctx.rng.next_seed()),
     ))
 }
@@ -49,7 +49,7 @@ pub struct Blink48Ports {
 impl Pattern for Blink48Ports {
     fn render(&mut self, info: &RenderInfo, c: &mut Chassi) {
         for p in &mut self.ports {
-            p.render(&mut c.leds, info.secs);
+            p.render(&mut c.leds, info.millis);
         }
     }
     fn info(&self) -> PatternInfo {
@@ -75,7 +75,7 @@ pub struct A9K40GE {
 impl Pattern for A9K40GE {
     fn render(&mut self, info: &RenderInfo, c: &mut Chassi) {
         for p in &mut self.ports {
-            p.render(&mut c.leds, info.secs);
+            p.render(&mut c.leds, info.millis);
         }
     }
     fn info(&self) -> PatternInfo {
@@ -103,7 +103,7 @@ pub struct X6704 {
 impl Pattern for X6704 {
     fn render(&mut self, info: &RenderInfo, c: &mut Chassi) {
         for p in &mut self.ports {
-            let v = utils::invert(p.faker.trig(info.secs));
+            let v = utils::invert(p.faker.trig(info.millis));
             c.leds[p.port].set_clamped(v * 0.3, v * 1.0, 0.0);
         }
     }
@@ -133,7 +133,7 @@ pub struct A9K8TL {
 impl Pattern for A9K8TL {
     fn render(&mut self, info: &RenderInfo, c: &mut Chassi) {
         for p in &mut self.ports {
-            if utils::invert(p.faker.trig(info.secs)) == 1.0 {
+            if utils::invert(p.faker.trig(info.millis)) == 1.0 {
                 c.leds[p.port].set_clamped(0.3, 1.0, 0.0);
             } else {
                 c.leds[p.port].set_clamped(1.0, 0.8, 0.0);

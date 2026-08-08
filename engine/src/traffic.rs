@@ -4,7 +4,7 @@
 //! [`Shaper::intensity`] takes the fractional hour-of-day (0.0..24.0) so the
 //! firmware feeds it from SNTP and the host from its clock.
 
-use libm::cosf;
+use crate::math;
 
 /// Config mirrors `configuration.TrafficShaper` (hours are 0..23).
 #[derive(Clone, Copy, Debug)]
@@ -61,7 +61,7 @@ impl Shaper {
         }
 
         let angle = (shifted / 24.0) * 2.0 * core::f32::consts::PI;
-        let sine = cosf(angle);
+        let sine = math::cosf(angle);
 
         ((sine + 1.0) / 2.0) * (self.cfg.peak_factor - self.cfg.low_factor) + self.cfg.low_factor
     }

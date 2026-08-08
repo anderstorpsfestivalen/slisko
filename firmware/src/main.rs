@@ -2,16 +2,13 @@
 //!
 //! Boots from the shared baked `config` crate (chassis, active patterns, ledinfo
 //! output map, shaper), brings up Ethernet (LAN8720) + SNTP, and runs the render
-//! loop driving the WS281x RMT channels off the monotonic esp_timer clock. The
-//! Controller is shared (Arc<Mutex>) so the HTTP control surface / DDP sink can
-//! drive it (added in later passes).
+//! loop driving either WS281x RMT channels or APA102 SPI chains off the
+//! monotonic esp_timer clock. The Controller is shared (Arc<Mutex>) so the HTTP
+//! control surface and DDP sink can drive it.
 
+mod apa102;
 mod board;
 mod buttons;
-// APA102/SPI transport for non-bong69 boards (selected by ledinfo type=APA102);
-// not instantiated here since this board's outputs are clockless WS281x.
-#[allow(dead_code)]
-mod apa102;
 mod ddp;
 mod http;
 mod net;
@@ -30,15 +27,36 @@ use log::{info, warn};
 
 use engine::chassi::Chassi;
 use engine::controller::Controller;
-use engine::output::{LedType, StrandMap};
+use engine::output::StrandMap;
 use engine::traffic::{Shaper, ShaperConfig};
 
+use apa102::Apa102Output;
 use config as cfg;
+use config::{LedDriver, LedOutput};
 use output::Ws281xOutput;
 
 const FPS: u32 = 60;
 
 type Shared = Arc<Mutex<Controller>>;
+
+enum PhysicalOutputs<'d> {
+    Ws281x(Ws281xOutput<'d>),
+    Apa102(Vec<Apa102Output<'d>>),
+}
+
+impl PhysicalOutputs<'_> {
+    fn write(&mut self, leds: &[engine::pixel::Pixel]) -> Result<(), EspError> {
+        match self {
+            Self::Ws281x(output) => output.write(leds),
+            Self::Apa102(outputs) => {
+                for output in outputs {
+                    output.write(leds)?;
+                }
+                Ok(())
+            }
+        }
+    }
+}
 
 fn main() -> Result<(), EspError> {
     link_patches();
@@ -51,7 +69,7 @@ fn main() -> Result<(), EspError> {
 
     // --- LED outputs: degrade the 8 board data pins, then map the baked ledinfo
     // outputs onto them. (Partial move leaves the Ethernet pins available.) ---
-    let led_slots: [(u8, Option<AnyOutputPin<'static>>); 8] = [
+    let mut led_slots: [(u8, Option<AnyOutputPin<'static>>); 8] = [
         (1, Some(pins.gpio1.degrade_output())),
         (2, Some(pins.gpio2.degrade_output())),
         (3, Some(pins.gpio3.degrade_output())),
@@ -61,21 +79,64 @@ fn main() -> Result<(), EspError> {
         (14, Some(pins.gpio14.degrade_output())),
         (15, Some(pins.gpio15.degrade_output())),
     ];
-    let ledtype = LedType::parse(cfg::LED_TYPE).unwrap_or(LedType::Ws2812);
-    let outputs = map_outputs(led_slots);
-    info!(
-        "ledinfo: type {} ({:?}), {} output(s) mapped",
-        cfg::LED_TYPE,
-        ledtype,
-        outputs.len()
-    );
-    if !ledtype.is_clockless() {
-        warn!(
-            "LED type {} is clocked (APA102); SPI transport not yet wired",
-            cfg::LED_TYPE
-        );
-    }
-    let mut leds = Ws281xOutput::new(outputs, ledtype)?;
+    let mut leds = match cfg::LED_DRIVER {
+        LedDriver::Ws281x(kind) => {
+            let outputs = map_ws281x_outputs(&mut led_slots);
+            info!(
+                "ledinfo: {:?}, {} RMT output(s) mapped",
+                kind,
+                outputs.len()
+            );
+            PhysicalOutputs::Ws281x(Ws281xOutput::new(outputs, kind)?)
+        }
+        LedDriver::Apa102(options) => {
+            let mut outputs = Vec::new();
+            let mut spi2 = Some(peripherals.spi2);
+            let mut spi3 = Some(peripherals.spi3);
+            for (index, output) in cfg::LED_OUTPUTS.iter().enumerate() {
+                let LedOutput::Apa102 {
+                    clock,
+                    data,
+                    start,
+                    end,
+                } = *output
+                else {
+                    warn!("ledinfo: ignoring WS281x mapping for APA102 driver");
+                    continue;
+                };
+                let Some(clock_pin) = take_led_pin(&mut led_slots, clock) else {
+                    continue;
+                };
+                let Some(data_pin) = take_led_pin(&mut led_slots, data) else {
+                    continue;
+                };
+                let output = match index {
+                    0 => Apa102Output::new(
+                        spi2.take().expect("baker limits APA102 to SPI2 and SPI3"),
+                        clock_pin,
+                        data_pin,
+                        start..end,
+                        options,
+                    )?,
+                    1 => Apa102Output::new(
+                        spi3.take().expect("baker limits APA102 to SPI2 and SPI3"),
+                        clock_pin,
+                        data_pin,
+                        start..end,
+                        options,
+                    )?,
+                    _ => unreachable!("baker limits APA102 to two chains"),
+                };
+                outputs.push(output);
+            }
+            info!(
+                "ledinfo: APA102 {:?}, {} SPI output(s) mapped",
+                options,
+                outputs.len()
+            );
+            PhysicalOutputs::Apa102(outputs)
+        }
+    };
 
     // --- Ethernet (the board's only network path) ---
     let eth_pins = net::EthPins {
@@ -162,7 +223,7 @@ fn main() -> Result<(), EspError> {
     let mut sntp_logged = false;
     let mut mapped_leds = Vec::with_capacity(cfg::LED_COUNT);
     loop {
-        let now = (unsafe { esp_timer_get_time() } - start_us) as f32 / 1_000_000.0;
+        let elapsed_us = (unsafe { esp_timer_get_time() } - start_us) as u64;
 
         // Once a second, refresh the shaper hour from SNTP (if synced).
         if let Some(ts) = &timesync
@@ -183,7 +244,7 @@ fn main() -> Result<(), EspError> {
                 // External source overrides internal patterns.
                 ddp_state.apply(&strand_map, c.leds_mut());
             } else {
-                c.tick(now);
+                c.tick_micros(elapsed_us);
             }
             strand_map.copy_pixels(c.leds(), &mut mapped_leds);
             leds.write(&mapped_leds)?;
@@ -206,21 +267,38 @@ fn shaper_config() -> ShaperConfig {
     }
 }
 
-/// Pair each baked `LedOutput` (matched by GPIO number) with the corresponding
-/// board pin and pixel range. Non-board GPIOs are skipped with a warning.
-fn map_outputs(
-    mut by_gpio: [(u8, Option<AnyOutputPin<'static>>); 8],
+/// Pair each baked WS281x data pin with its board pin and pixel range.
+fn map_ws281x_outputs(
+    by_gpio: &mut [(u8, Option<AnyOutputPin<'static>>); 8],
 ) -> Vec<(AnyOutputPin<'static>, core::ops::Range<usize>)> {
     let mut outputs = Vec::new();
     for o in cfg::LED_OUTPUTS {
-        match by_gpio.iter_mut().find(|(g, _)| *g == o.gpio) {
-            Some((_, slot @ Some(_))) => outputs.push((slot.take().unwrap(), o.start..o.end)),
-            Some((_, None)) => warn!("ledinfo: GPIO{} used more than once; skipping", o.gpio),
-            None => warn!(
-                "ledinfo: GPIO{} is not a board LED output; skipping",
-                o.gpio
-            ),
+        let LedOutput::Ws281x { data, start, end } = *o else {
+            warn!("ledinfo: ignoring APA102 mapping for WS281x driver");
+            continue;
+        };
+        if let Some(pin) = take_led_pin(by_gpio, data) {
+            outputs.push((pin, start..end));
         }
     }
     outputs
+}
+
+/// Resolve one GPIO against the LED-capable pins on this bong69 revision while
+/// preserving the existing unavailable/reused warnings.
+fn take_led_pin(
+    by_gpio: &mut [(u8, Option<AnyOutputPin<'static>>); 8],
+    gpio: u8,
+) -> Option<AnyOutputPin<'static>> {
+    match by_gpio.iter_mut().find(|(candidate, _)| *candidate == gpio) {
+        Some((_, slot @ Some(_))) => slot.take(),
+        Some((_, None)) => {
+            warn!("ledinfo: GPIO{gpio} used more than once; skipping");
+            None
+        }
+        None => {
+            warn!("ledinfo: GPIO{gpio} is not a board LED output; skipping");
+            None
+        }
+    }
 }

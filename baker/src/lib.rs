@@ -7,11 +7,11 @@
 //! `prettyplease`.
 
 use engine::controller::PATTERN_NAMES;
-use engine::output::LedType;
+use engine::output::Ws281xType;
 use proc_macro2::{Literal, Span, TokenStream};
 use quote::{format_ident, quote};
 use serde::Deserialize;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -47,8 +47,8 @@ pub struct BakedConfig {
     cards: Vec<CardDefinition>,
     mapping: Vec<Mapping>,
     patterns: Vec<String>,
-    led_type: String,
-    led_outputs: Vec<LedOutput>,
+    led_driver: BakedLedDriver,
+    led_outputs: Vec<BakedLedOutput>,
     shaper: TrafficShaper,
     buttons: Vec<Button>,
 }
@@ -151,12 +151,52 @@ impl BakedConfig {
             .iter()
             .map(|pattern| LitStr::new(pattern, Span::call_site()))
             .collect::<Vec<LitStr>>();
-        let led_type = LitStr::new(&self.led_type, Span::call_site());
-        let led_outputs = self.led_outputs.iter().map(|output| {
-            let gpio = Literal::u8_unsuffixed(output.gpio);
-            let start = Literal::usize_unsuffixed(output.start);
-            let end = Literal::usize_unsuffixed(output.end);
-            quote!(LedOutput { gpio: #gpio, start: #start, end: #end })
+        let led_driver = match self.led_driver {
+            BakedLedDriver::Ws281x(kind) => {
+                let kind = match kind {
+                    Ws281xType::Ws2811 => quote!(engine::output::Ws281xType::Ws2811),
+                    Ws281xType::Ws2812 => quote!(engine::output::Ws281xType::Ws2812),
+                    Ws281xType::Ws2813 => quote!(engine::output::Ws281xType::Ws2813),
+                    Ws281xType::Ws2815 => quote!(engine::output::Ws281xType::Ws2815),
+                    Ws281xType::Sk6812 => quote!(engine::output::Ws281xType::Sk6812),
+                };
+                quote!(LedDriver::Ws281x(#kind))
+            }
+            BakedLedDriver::Apa102(options) => {
+                let intensity = Literal::u8_unsuffixed(options.intensity);
+                let temperature = Literal::u16_unsuffixed(options.temperature);
+                let global_pwm = options.global_pwm;
+                quote!(LedDriver::Apa102(engine::output::Apa102Options {
+                    intensity: #intensity,
+                    temperature: #temperature,
+                    global_pwm: #global_pwm,
+                }))
+            }
+        };
+        let led_outputs = self.led_outputs.iter().map(|output| match output {
+            BakedLedOutput::Ws281x { data, start, end } => {
+                let data = Literal::u8_unsuffixed(*data);
+                let start = Literal::usize_unsuffixed(*start);
+                let end = Literal::usize_unsuffixed(*end);
+                quote!(LedOutput::Ws281x { data: #data, start: #start, end: #end })
+            }
+            BakedLedOutput::Apa102 {
+                clock,
+                data,
+                start,
+                end,
+            } => {
+                let clock = Literal::u8_unsuffixed(*clock);
+                let data = Literal::u8_unsuffixed(*data);
+                let start = Literal::usize_unsuffixed(*start);
+                let end = Literal::usize_unsuffixed(*end);
+                quote!(LedOutput::Apa102 {
+                    clock: #clock,
+                    data: #data,
+                    start: #start,
+                    end: #end,
+                })
+            }
         });
         let buttons = self.buttons.iter().map(|button| {
             let gpio = Literal::u8_unsuffixed(button.gpio);
@@ -176,7 +216,7 @@ impl BakedConfig {
         let low_factor = Literal::f32_unsuffixed(self.shaper.low_factor);
 
         let tokens = quote! {
-            use crate::{Button, LedOutput};
+            use crate::{Button, LedDriver, LedOutput};
             use engine::chassi::LineCardSpec;
             use engine::output::MappingSegment;
             use engine::pixel::Position;
@@ -188,7 +228,7 @@ impl BakedConfig {
             pub const LED_COUNT: usize = #led_count;
             pub static OUTPUT_MAPPING: &[MappingSegment] = &[#(#mapping),*];
             pub static ACTIVE_PATTERNS: &[&str] = &[#(#patterns),*];
-            pub static LED_TYPE: &str = #led_type;
+            pub static LED_DRIVER: LedDriver = #led_driver;
             pub static LED_OUTPUTS: &[LedOutput] = &[#(#led_outputs),*];
             pub static SHAPER: ShaperConfig = ShaperConfig {
                 enabled: #enabled,
@@ -294,23 +334,59 @@ fn validate_and_expand(source: &Path, raw: RawConfig) -> Result<BakedConfig> {
 
     validate_patterns("Patterns", &raw.patterns)?;
 
-    let (led_type, led_outputs) = match raw.led_info {
+    let (led_driver, led_outputs) = match raw.led_info {
         Some(info) => {
             if info.kind.trim().is_empty() {
                 return Err(BakeError::new("ledinfo.type: must not be empty"));
             }
-            if LedType::parse(&info.kind).is_none() {
+            let driver_kind = if let Some(kind) = Ws281xType::parse(&info.kind) {
+                if info.intensity.is_some()
+                    || info.temperature.is_some()
+                    || info.global_pwm.is_some()
+                {
+                    return Err(BakeError::new(
+                        "ledinfo: intensity, temperature, and global_pwm are APA102-only options",
+                    ));
+                }
+                BakedLedDriver::Ws281x(kind)
+            } else if info.kind.eq_ignore_ascii_case("APA102") {
+                if info.mapping.len() > 2 {
+                    return Err(BakeError::new(format!(
+                        "ledinfo.mapping: APA102 supports at most two independent chains, got {}",
+                        info.mapping.len()
+                    )));
+                }
+                let intensity = info.intensity.unwrap_or(255);
+                let intensity = u8::try_from(intensity).map_err(|_| {
+                    BakeError::new(format!("ledinfo.intensity: {intensity} is outside 0..=255"))
+                })?;
+                let temperature = info.temperature.unwrap_or(5000);
+                if !(1000..=29999).contains(&temperature) {
+                    return Err(BakeError::new(format!(
+                        "ledinfo.temperature: {temperature} is outside 1000..=29999K"
+                    )));
+                }
+                BakedLedDriver::Apa102(BakedApa102Options {
+                    intensity,
+                    temperature: temperature as u16,
+                    global_pwm: info.global_pwm.unwrap_or(true),
+                })
+            } else {
                 return Err(BakeError::new(format!(
                     "ledinfo.type: unsupported LED type {:?}",
                     info.kind
                 )));
-            }
+            };
+
             let mut outputs = Vec::with_capacity(info.mapping.len());
+            let mut apa_pins = BTreeSet::new();
             for (index, output) in info.mapping.into_iter().enumerate() {
                 let field = format!("ledinfo.mapping[{index}]");
-                let gpio = u8::try_from(output.gpio).map_err(|_| {
-                    BakeError::new(format!("{field}.gpio: {} is outside 0..=255", output.gpio))
-                })?;
+                if output.gpio.is_some() {
+                    return Err(BakeError::new(format!(
+                        "{field}.gpio: legacy field; migrate WS281x outputs to 'data', or APA102 outputs to 'clock' and 'data'"
+                    )));
+                }
                 let (start, end) = parse_range(&output.range, &format!("{field}.range"))?;
                 if start >= end {
                     return Err(BakeError::new(format!(
@@ -324,11 +400,39 @@ fn validate_and_expand(source: &Path, raw: RawConfig) -> Result<BakedConfig> {
                         raw.led_amount
                     )));
                 }
-                outputs.push(LedOutput { gpio, start, end });
+
+                match driver_kind {
+                    BakedLedDriver::Ws281x(_) => {
+                        if output.clock.is_some() {
+                            return Err(BakeError::new(format!(
+                                "{field}.clock: WS281x outputs use only a 'data' pin"
+                            )));
+                        }
+                        let data = parse_led_pin(output.data, &format!("{field}.data"))?;
+                        outputs.push(BakedLedOutput::Ws281x { data, start, end });
+                    }
+                    BakedLedDriver::Apa102(_) => {
+                        let clock = parse_led_pin(output.clock, &format!("{field}.clock"))?;
+                        let data = parse_led_pin(output.data, &format!("{field}.data"))?;
+                        for (role, pin) in [("clock", clock), ("data", data)] {
+                            if !apa_pins.insert(pin) {
+                                return Err(BakeError::new(format!(
+                                    "{field}.{role}: GPIO{pin} is reused by an APA102 chain"
+                                )));
+                            }
+                        }
+                        outputs.push(BakedLedOutput::Apa102 {
+                            clock,
+                            data,
+                            start,
+                            end,
+                        });
+                    }
+                }
             }
-            (info.kind, outputs)
+            (driver_kind, outputs)
         }
-        None => ("WS2812".to_owned(), Vec::new()),
+        None => (BakedLedDriver::Ws281x(Ws281xType::Ws2812), Vec::new()),
     };
 
     let shaper = raw.traffic_shaper.unwrap_or_default();
@@ -350,7 +454,7 @@ fn validate_and_expand(source: &Path, raw: RawConfig) -> Result<BakedConfig> {
         cards,
         mapping,
         patterns: raw.patterns,
-        led_type,
+        led_driver,
         led_outputs,
         shaper,
         buttons,
@@ -386,6 +490,11 @@ fn parse_range(value: &str, field: &str) -> Result<(usize, usize)> {
         .parse::<usize>()
         .map_err(|error| BakeError::new(format!("{field}: invalid end in {value:?}: {error}")))?;
     Ok((start, end))
+}
+
+fn parse_led_pin(value: Option<i64>, field: &str) -> Result<u8> {
+    let value = value.ok_or_else(|| BakeError::new(format!("{field}: is required")))?;
+    u8::try_from(value).map_err(|_| BakeError::new(format!("{field}: {value} is outside 0..=255")))
 }
 
 fn parse_gpio(value: &str, field: &str) -> Result<u8> {
@@ -441,12 +550,23 @@ struct RawLedInfo {
     kind: String,
     #[serde(default)]
     mapping: Vec<RawLedOutput>,
+    #[serde(default)]
+    intensity: Option<i64>,
+    #[serde(default)]
+    temperature: Option<i64>,
+    #[serde(default)]
+    global_pwm: Option<bool>,
 }
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawLedOutput {
-    gpio: i64,
+    #[serde(default)]
+    gpio: Option<i64>,
+    #[serde(default)]
+    clock: Option<i64>,
+    #[serde(default)]
+    data: Option<i64>,
     range: String,
 }
 
@@ -522,10 +642,31 @@ enum Mapping {
     Gap(usize),
 }
 
-struct LedOutput {
-    gpio: u8,
-    start: usize,
-    end: usize,
+#[derive(Clone, Copy)]
+enum BakedLedDriver {
+    Ws281x(Ws281xType),
+    Apa102(BakedApa102Options),
+}
+
+#[derive(Clone, Copy)]
+struct BakedApa102Options {
+    intensity: u8,
+    temperature: u16,
+    global_pwm: bool,
+}
+
+enum BakedLedOutput {
+    Ws281x {
+        data: u8,
+        start: usize,
+        end: usize,
+    },
+    Apa102 {
+        clock: u8,
+        data: u8,
+        start: usize,
+        end: usize,
+    },
 }
 
 struct Button {
@@ -868,9 +1009,19 @@ mod tests {
         assert_eq!(baked.cards[5].labeled["fail"], 9);
         assert_eq!(baked.cards[5].positions[3], position(43, 880, 4));
         assert_eq!(baked.cards[5].positions[7], position(30, 880, 4));
-        assert_eq!(baked.led_type, "WS2815");
+        assert!(matches!(
+            baked.led_driver,
+            BakedLedDriver::Ws281x(Ws281xType::Ws2815)
+        ));
         assert_eq!(baked.led_outputs.len(), 2);
-        assert_eq!(baked.led_outputs[1].end, 200);
+        assert!(matches!(
+            baked.led_outputs[1],
+            BakedLedOutput::Ws281x {
+                data: 7,
+                start: 100,
+                end: 200
+            }
+        ));
         assert_eq!(baked.buttons[0].scene[3], "a9k-rsp440-tr");
         let rendered = baked.render();
         syn::parse_file(&rendered).expect("rendered 9010 configuration must be valid Rust");
@@ -885,8 +1036,24 @@ mod tests {
         assert_eq!(baked.cards[0].positions.len(), 49);
         assert_eq!(baked.cards[4].positions.len(), 9);
         assert_eq!(baked.cards[8].labeled["p48"], 48);
-        assert_eq!(baked.led_type, "APA102");
+        assert!(matches!(
+            baked.led_driver,
+            BakedLedDriver::Apa102(BakedApa102Options {
+                intensity: 255,
+                temperature: 5000,
+                global_pwm: true,
+            })
+        ));
         assert_eq!(baked.led_outputs.len(), 1);
+        assert!(matches!(
+            baked.led_outputs[0],
+            BakedLedOutput::Apa102 {
+                clock: 14,
+                data: 5,
+                start: 0,
+                end: 132,
+            }
+        ));
         assert_eq!(baked.mapping.len(), 11);
         let rendered = baked.render();
         syn::parse_file(&rendered).expect("rendered 7609 configuration must be valid Rust");
@@ -945,7 +1112,7 @@ mod tests {
             Linecards = ["blank"]
             [ledinfo]
             type = "WS2815"
-            mapping = [{ gpio = 5, range = "nope" }]
+            mapping = [{ data = 5, range = "nope" }]
         "#;
         let error = bake_text(Path::new("bad.toml"), malformed)
             .err()
@@ -962,5 +1129,170 @@ mod tests {
             .err()
             .expect("configuration should be rejected");
         assert!(error.to_string().contains("ledinfo.type"));
+    }
+
+    #[test]
+    fn defaults_to_typed_ws2812_driver() {
+        let baked = bake_text(
+            Path::new("default.toml"),
+            r#"
+                LEDAmount = 1
+                Linecards = ["blank"]
+                Mapping = [{ gen = 1 }]
+            "#,
+        )
+        .unwrap();
+        assert!(matches!(
+            baked.led_driver,
+            BakedLedDriver::Ws281x(Ws281xType::Ws2812)
+        ));
+        assert!(baked.led_outputs.is_empty());
+        assert!(
+            baked
+                .render()
+                .contains("LedDriver::Ws281x(engine::output::Ws281xType::Ws2812)")
+        );
+    }
+
+    #[test]
+    fn bakes_custom_apa102_options_and_two_typed_chains() {
+        let baked = bake_text(
+            Path::new("apa.toml"),
+            r#"
+                LEDAmount = 10
+                Linecards = ["blank"]
+                Mapping = [{ gen = 10 }]
+                [ledinfo]
+                type = "APA102"
+                intensity = 128
+                temperature = 6500
+                global_pwm = false
+                mapping = [
+                    { clock = 14, data = 5, range = "0-5" },
+                    { clock = 12, data = 15, range = "5-10" },
+                ]
+            "#,
+        )
+        .unwrap();
+        assert!(matches!(
+            baked.led_driver,
+            BakedLedDriver::Apa102(BakedApa102Options {
+                intensity: 128,
+                temperature: 6500,
+                global_pwm: false,
+            })
+        ));
+        let rendered = baked.render();
+        assert!(rendered.contains("LedDriver::Apa102(engine::output::Apa102Options"));
+        assert!(rendered.contains("LedOutput::Apa102"));
+    }
+
+    #[test]
+    fn rejects_legacy_and_mixed_led_pin_fields() {
+        let cases = [
+            (
+                r#"
+                    LEDAmount = 1
+                    Linecards = ["blank"]
+                    [ledinfo]
+                    type = "WS2815"
+                    mapping = [{ gpio = 5, range = "0-1" }]
+                "#,
+                "legacy field",
+            ),
+            (
+                r#"
+                    LEDAmount = 1
+                    Linecards = ["blank"]
+                    [ledinfo]
+                    type = "WS2815"
+                    mapping = [{ clock = 14, data = 5, range = "0-1" }]
+                "#,
+                "WS281x outputs use only",
+            ),
+            (
+                r#"
+                    LEDAmount = 1
+                    Linecards = ["blank"]
+                    [ledinfo]
+                    type = "APA102"
+                    mapping = [{ data = 5, range = "0-1" }]
+                "#,
+                ".clock: is required",
+            ),
+            (
+                r#"
+                    LEDAmount = 1
+                    Linecards = ["blank"]
+                    [ledinfo]
+                    type = "WS2815"
+                    intensity = 128
+                    mapping = [{ data = 5, range = "0-1" }]
+                "#,
+                "APA102-only options",
+            ),
+        ];
+        for (input, expected) in cases {
+            let error = bake_text(Path::new("bad.toml"), input).err().unwrap();
+            assert!(
+                error.to_string().contains(expected),
+                "{error:?} did not contain {expected:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_invalid_apa102_temperature_reused_pins_and_chain_limit() {
+        let invalid_temperature = r#"
+            LEDAmount = 1
+            Linecards = ["blank"]
+            [ledinfo]
+            type = "APA102"
+            temperature = 30000
+        "#;
+        assert!(
+            bake_text(Path::new("bad.toml"), invalid_temperature)
+                .err()
+                .unwrap()
+                .to_string()
+                .contains("1000..=29999K")
+        );
+
+        let reused = r#"
+            LEDAmount = 2
+            Linecards = ["blank"]
+            [ledinfo]
+            type = "APA102"
+            mapping = [
+                { clock = 14, data = 5, range = "0-1" },
+                { clock = 12, data = 5, range = "1-2" },
+            ]
+        "#;
+        assert!(
+            bake_text(Path::new("bad.toml"), reused)
+                .err()
+                .unwrap()
+                .to_string()
+                .contains("GPIO5 is reused")
+        );
+
+        let too_many = r#"
+            LEDAmount = 3
+            Linecards = ["blank"]
+            [ledinfo]
+            type = "APA102"
+            mapping = [
+                { clock = 1, data = 2, range = "0-1" },
+                { clock = 3, data = 4, range = "1-2" },
+                { clock = 5, data = 6, range = "2-3" },
+            ]
+        "#;
+        assert!(
+            bake_text(Path::new("bad.toml"), too_many)
+                .err()
+                .unwrap()
+                .to_string()
+                .contains("at most two")
+        );
     }
 }

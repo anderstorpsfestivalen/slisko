@@ -11,4 +11,4 @@ clap = { version = "4.6.6", features = ["derive"] }
 ddp-rs = "1.3.0"
 ggez = { version = "0.10.0", default-features = false }
 config = { version = "0.1.0", path = "../config" }
-engine = { path = "../engine" }
+engine = { path = "../engine", features = ["std"] }

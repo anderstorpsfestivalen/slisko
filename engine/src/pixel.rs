@@ -8,7 +8,7 @@ pub struct Position {
     pub size: f32,
 }
 
-/// An RGB pixel with channels in the `[0.0, 1.0]` range.
+/// An RGB pixel with perceptual sRGB channels in the `[0.0, 1.0]` range.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Pixel {
     pub r: f32,
@@ -49,9 +49,9 @@ impl Pixel {
         self.pos = Position { x, y, size };
     }
 
-    /// Convert to an 8-bit `[r, g, b]` triple (mirrors the `output` stage's
-    /// `Clamp255(channel * 255)`).
-    pub fn to_rgb8(&self) -> [u8; 3] {
+    /// Quantize the logical color to an 8-bit perceptual sRGB `[r, g, b]`
+    /// triple. This does not linearize the channels for physical LED PWM.
+    pub fn to_srgb8(&self) -> [u8; 3] {
         [
             clamp255(self.r * 255.0),
             clamp255(self.g * 255.0),
@@ -98,9 +98,19 @@ mod tests {
     }
 
     #[test]
-    fn to_rgb8_full_white() {
+    fn to_srgb8_full_white() {
         let mut p = Pixel::new();
         p.set_color(1.0, 1.0, 1.0);
-        assert_eq!(p.to_rgb8(), [255, 255, 255]);
+        assert_eq!(p.to_srgb8(), [255, 255, 255]);
+    }
+
+    #[test]
+    fn every_srgb8_value_round_trips_through_logical_float_space() {
+        for value in 0..=255u8 {
+            let channel = f32::from(value) / 255.0;
+            let mut pixel = Pixel::new();
+            pixel.set_color(channel, channel, channel);
+            assert_eq!(pixel.to_srgb8(), [value, value, value]);
+        }
     }
 }

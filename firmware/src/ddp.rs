@@ -62,7 +62,7 @@ impl DdpState {
     /// Paint the latest DDP RGB buffer into the strand.
     pub fn apply(&self, map: &StrandMap, leds: &mut [Pixel]) {
         let buf = self.rgb.lock().unwrap();
-        let _ = map.apply_rgb(&buf, leds);
+        let _ = map.apply_srgb8(&buf, leds);
     }
 
     fn ingest(&self, offset: usize, data: &[u8]) {

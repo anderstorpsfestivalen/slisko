@@ -4,6 +4,11 @@ version = "0.1.0"
 edition.workspace = true
 license.workspace = true
 
+[features]
+# Native runners opt into std explicitly. With no features the engine remains
+# portable no_std + alloc and uses pure-Rust libm unless targeting ESP-IDF.
+std = []
+
 # Portable render engine. no_std + alloc so it compiles for the ESP32; tests
 # and the host runner pull in std via the test harness / the std `host`
 # crate. Dependencies are added with `cargo add` (latest), never pinned by hand.

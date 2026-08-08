@@ -44,5 +44,5 @@ port = 4048
 [ledinfo]
 type = "APA102"
 mapping = [
-    {gpio = 5, range = "0-132"},
+    {clock = 14, data = 5, range = "0-132"},
 ]

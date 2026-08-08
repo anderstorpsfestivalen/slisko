@@ -107,12 +107,12 @@ fn run_with(args: Args) -> Result<(), Box<dyn std::error::Error>> {
         if now < next_frame {
             thread::sleep(next_frame - now);
         }
-        let elapsed = start.elapsed().as_secs_f32();
+        let elapsed_us = start.elapsed().as_micros() as u64;
         if args.hour.is_none() && controller.frame() % args.fps as i64 == 0 {
             controller.set_hour(local_hour());
         }
-        controller.tick(elapsed);
-        strand_map.encode_rgb(controller.leds(), &mut rgb);
+        controller.tick_micros(elapsed_us);
+        strand_map.encode_srgb8(controller.leds(), &mut rgb);
         ddp.write(&rgb)?;
 
         next_frame += frame_time;
@@ -218,5 +218,23 @@ mod tests {
         .unwrap();
         sender.write(&restarted).unwrap();
         assert_eq!(receive_frame(&receiver, restarted.len()), restarted);
+    }
+
+    #[test]
+    fn ddp_payload_keeps_logical_srgb_instead_of_physical_pwm() {
+        let mut chassi = Chassi::from_specs(config::CHASSIS);
+        for pixel in &mut chassi.leds {
+            pixel.set_color(0.5, 0.5, 0.5);
+        }
+        let map = StrandMap::new(&chassi, config::OUTPUT_MAPPING, config::LED_COUNT).unwrap();
+        let mut payload = Vec::new();
+        map.encode_srgb8(&chassi.leds, &mut payload);
+
+        assert!(
+            payload
+                .chunks_exact(3)
+                .any(|pixel| pixel == [127, 127, 127])
+        );
+        assert!(!payload.chunks_exact(3).any(|pixel| pixel == [55, 55, 55]));
     }
 }

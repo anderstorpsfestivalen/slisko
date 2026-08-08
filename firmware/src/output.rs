@@ -5,8 +5,7 @@
 //! we encode that slice to WS281x bytes (`engine::output`) and hand them to
 //! a `BytesEncoder` configured with the chip's bit0/bit1 timing symbols.
 //!
-//! APA102 (clocked, SPI) will be a sibling module; this one is the bong69's
-//! native clockless path.
+//! APA102 (clocked, SPI) is handled by the sibling `apa102` module.
 
 use core::ops::Range;
 use core::time::Duration;
@@ -18,7 +17,7 @@ use esp_idf_hal::rmt::{PinState, Pulse, Symbol, TxChannelDriver};
 use esp_idf_hal::sys::EspError;
 use esp_idf_hal::units::{FromValueType, Hertz};
 
-use engine::output::{ColorOrder, LedType, encode_ws281x};
+use engine::output::{ColorOrder, Ws281xType, encode_ws281x};
 use engine::pixel::Pixel;
 
 /// RMT tick resolution: 10 MHz → 100 ns/tick (the espressif led_strip default;
@@ -37,7 +36,7 @@ struct BitTiming {
 /// Bit timing per chip. One 800 kbps WS281x profile for now; per-type tuning
 /// (e.g. WS2811 low-speed, WS2815 exact widths) is a TODO once we can scope it
 /// on hardware.
-fn timing_for(_t: LedType) -> BitTiming {
+fn timing_for(_t: Ws281xType) -> BitTiming {
     BitTiming {
         t0h: 350,
         t0l: 800,
@@ -46,7 +45,7 @@ fn timing_for(_t: LedType) -> BitTiming {
     }
 }
 
-fn encoder_config(t: LedType, res: Hertz) -> Result<BytesEncoderConfig, EspError> {
+fn encoder_config(t: Ws281xType, res: Hertz) -> Result<BytesEncoderConfig, EspError> {
     let bt = timing_for(t);
     let bit0 = Symbol::new(
         Pulse::new_with_duration(res, PinState::High, Duration::from_nanos(bt.t0h))?,
@@ -82,7 +81,7 @@ impl<'d> Ws281xOutput<'d> {
     /// clockless chip (use the APA102/SPI path otherwise).
     pub fn new(
         outputs: Vec<(AnyOutputPin<'d>, Range<usize>)>,
-        ledtype: LedType,
+        ledtype: Ws281xType,
     ) -> Result<Self, EspError> {
         let res: Hertz = RESOLUTION_MHZ.MHz().into();
         let ch_cfg = TxChannelConfig {

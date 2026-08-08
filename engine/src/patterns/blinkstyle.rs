@@ -2,8 +2,8 @@
 //!
 //! A [`BlinkStyle`] describes how a linecard's ports blink; [`PortState`] is one
 //! port's runtime state (a faker + target pixel index + color), built by
-//! [`BlinkStyle::create_port`]. Durations are `f32` seconds (Go used
-//! `time.Duration`).
+//! [`BlinkStyle::create_port`]. Configured durations are `f32` seconds and
+//! runtime deadlines are integer milliseconds (Go used `time.Duration`).
 
 use alloc::boxed::Box;
 
@@ -48,7 +48,7 @@ pub struct PortState {
 
 impl PortState {
     /// Render this port into the strand (mirrors `PortState.Render`).
-    pub fn render(&mut self, leds: &mut [Pixel], now: f32) {
+    pub fn render(&mut self, leds: &mut [Pixel], now: u32) {
         let px = &mut leds[self.port];
         if self.is_dead {
             px.set_clamped(self.style.r, self.style.g, self.style.b);
@@ -85,7 +85,7 @@ impl BlinkStyle {
             self.max_blinks,
             self.min_cycle,
             self.max_cycle,
-            0.0,
+            0,
             Rng::new(ctx.rng.next_seed()),
         );
         let faker = RandomInterval::new(
@@ -94,7 +94,7 @@ impl BlinkStyle {
             self.min_blink * inv,
             self.max_blink * inv,
             Box::new(blinker),
-            0.0,
+            0,
             Rng::new(ctx.rng.next_seed()),
         );
 

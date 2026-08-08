@@ -16,14 +16,14 @@ fn ri(
     max_b: f32,
     ctx: &mut BootstrapCtx,
 ) -> Box<dyn Fake + Send> {
-    let blinker = RandomBlinker::new(15.0, 40.0, 1.0, 10.0, 0.0, Rng::new(ctx.rng.next_seed()));
+    let blinker = RandomBlinker::new(15.0, 40.0, 1.0, 10.0, 0, Rng::new(ctx.rng.next_seed()));
     Box::new(RandomInterval::new(
         min_i,
         max_i,
         min_b,
         max_b,
         Box::new(blinker),
-        0.0,
+        0,
         Rng::new(ctx.rng.next_seed()),
     ))
 }
@@ -70,12 +70,12 @@ impl Pattern for RSP440 {
         let d0 = self
             .disk0
             .as_mut()
-            .map(|f| f.trig(info.secs))
+            .map(|f| f.trig(info.millis))
             .unwrap_or(0.0);
         let d1 = self
             .disk1
             .as_mut()
-            .map(|f| f.trig(info.secs))
+            .map(|f| f.trig(info.millis))
             .unwrap_or(0.0);
 
         for labels in [&self.se, &self.se2] {
@@ -123,23 +123,23 @@ impl Pattern for SUP720 {
         let d0 = self
             .disk0
             .as_mut()
-            .map(|f| f.trig(info.secs))
+            .map(|f| f.trig(info.millis))
             .unwrap_or(0.0);
         let d1 = self
             .disk1
             .as_mut()
-            .map(|f| f.trig(info.secs))
+            .map(|f| f.trig(info.millis))
             .unwrap_or(0.0);
         let p0v = utils::invert(
             self.port0
                 .as_mut()
-                .map(|f| f.trig(info.secs))
+                .map(|f| f.trig(info.millis))
                 .unwrap_or(0.0),
         );
         let p1v = utils::invert(
             self.port1
                 .as_mut()
-                .map(|f| f.trig(info.secs))
+                .map(|f| f.trig(info.millis))
                 .unwrap_or(0.0),
         );
 

@@ -22,6 +22,9 @@ Set `SLISKO_CONFIG` before building to select a non-default configuration.
 - **LED data outputs (clockless WS281x):** GPIO 1, 2, 3, 4, 5, 12, 14, 15.
   Classic ESP32 has 8 RMT channels → one per output. GPIO1/3 are also UART0
   TX/RX — flash over USB-C, log over the network (no WiFi fallback).
+- **APA102 outputs:** configured clock/data pairs use SPI2 and then SPI3, with
+  no chip-select. SPI0/1 remain reserved for flash/cache access, so the
+  firmware supports at most two independent APA102 chains.
 - **Ethernet is the only network path (LAN8720 RMII):** MDC=GPIO23, MDIO=GPIO18,
   RMII 50 MHz clock=GPIO0 (input), PHY power-enable=GPIO16, phy_addr=1.
   RMII data on GPIO 13/19/21/22/25/26/27. Disjoint from the LED pins.
