@@ -1,0 +1,26 @@
+# slisko Rust workspace
+#
+# `engine` (no_std+alloc) holds the portable render engine — patterns, chassi,
+# fakers, traffic shaper — and compiles for both `host` and the ESP32 firmware.
+# `sim` is a separate, persistent DDP viewer.
+#
+# `firmware` is EXCLUDED from the default workspace build because it targets
+# xtensa-esp32 via esp-idf and will not compile for the host. Build it from its
+# own directory with the esp toolchain (see firmware/README.md). Keeping it out
+# of `members` lets `cargo build`/`cargo test` at the workspace root work with a
+# plain stable toolchain.
+[workspace]
+resolver = "3"
+members = [
+    "baker",
+    "engine",
+    "config",
+    "host",
+    "sim",
+]
+default-members = ["baker", "engine", "config", "host"]
+exclude = ["firmware"]
+
+[workspace.package]
+edition = "2024"
+license = "MIT"

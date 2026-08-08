@@ -23,4 +23,23 @@ assets/.DS_Store
 
 *.DS_Store
 /slisko
-/baker
+
+# Relocated legacy build products
+/prev/slisko
+/prev/baker
+/prev/generated.rs
+
+# Rust build output
+/target
+**/target
+
+# esp-idf-sys / embuild: downloaded ESP-IDF + toolchain
+.embuild/
+**/.embuild/
+
+# esp-idf generated config
+**/sdkconfig
+**/sdkconfig.old
+
+# Managed-component lock regenerated from idf_component.yml
+**/dependencies.lock

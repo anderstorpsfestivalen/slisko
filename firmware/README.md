@@ -1,53 +1,35 @@
-# slisko firmware
+# Firmware — ESP32 (bong69 / WT32-ETH01)
 
-Bakes the slisko render engine down onto the bong69 ESP32 board so it computes
-patterns itself — no Raspberry Pi. See the design plan at
-`.claude/plans/i-am-interested-in-goofy-canyon.md`.
+Targets `xtensa-esp32-espidf`. **Excluded from the host workspace** (it can't
+compile for the host); build it from this directory with the esp toolchain.
 
-## Crates
-
-| crate | target | what |
-|-------|--------|------|
-| `slisko-core` | host + esp32 | `no_std + alloc` portable render engine and physical-strand mapper. Ported from the Go `pkg/*` + `patterns/*`. |
-| `slisko-config` | host + esp32 | Shared baker-generated chassis, mapping, active patterns, shaper, outputs, and buttons. |
-| `slisko-host` | host (std) | Runs `slisko-core` natively and streams the final mapped RGB strand over DDP. |
-| `slisko-sim`  | host (std) | Optional persistent ggez viewer. Receives DDP independently and overlays LEDs on the chassis artwork. |
-| `slisko-fw`   | xtensa-esp32-espidf | the ESP32 firmware. **Excluded from the workspace** (needs the esp toolchain). See `slisko-fw/README.md`. |
-
-The shared config is emitted as `slisko-config/src/generated.rs` by the Go
-`cmd/baker` tool (reuses `pkg/configuration` + `pkg/chassi`). The generated file
-is committed so firmware builds do not require Go.
-
-## Host build (stable toolchain)
+## One-time toolchain setup (cargo-native)
 
 ```sh
-cargo test                         # headless core/config/host tests
-cargo test -p slisko-sim           # optional DDP/viewer logic tests
-
-# Terminal 1: leave this open across runner rebuilds/restarts.
-cargo run -p slisko-sim
-
-# Terminal 2: render the baked patterns and send them to the viewer.
-cargo run -p slisko-host
-
-# Try one pattern with deterministic timing/input.
-cargo run -p slisko-host -- --pattern colorcycler --seed 1 --hour 12
+cargo install espup espflash ldproxy
+espup install                       # installs the Xtensa Rust fork + LLVM
+. $HOME/export-esp.sh               # adds the toolchain to PATH (per shell)
+cargo install esp-generate          # project scaffolder
 ```
 
-Both commands default to UDP port 4048 on localhost. `slisko-sim` retains the
-last complete frame when the sender exits and accepts a restarted sender with a
-new source port immediately. Run `--help` on either command for address, FPS,
-seed, hour, pattern, and asset-path overrides.
+The first `firmware` build downloads ESP-IDF (~GB) via `esp-idf-sys`.
 
-To bake a different chassis before building any Rust target:
+The firmware dependencies and cargo/sdkconfig wiring are already checked in.
+Set `SLISKO_CONFIG` before building to select a non-default configuration.
+
+## Board facts (source: github.com/bobko69/8PortLEDDistro)
+
+- **LED data outputs (clockless WS281x):** GPIO 1, 2, 3, 4, 5, 12, 14, 15.
+  Classic ESP32 has 8 RMT channels → one per output. GPIO1/3 are also UART0
+  TX/RX — flash over USB-C, log over the network (no WiFi fallback).
+- **Ethernet is the only network path (LAN8720 RMII):** MDC=GPIO23, MDIO=GPIO18,
+  RMII 50 MHz clock=GPIO0 (input), PHY power-enable=GPIO16, phy_addr=1.
+  RMII data on GPIO 13/19/21/22/25/26/27. Disjoint from the LED pins.
+- **Button/sensor headers:** H1=GPIO17/32/33, H2=GPIO34, H3=GPIO35, H4=GPIO36
+  (34/35/36 are input-only).
+
+## Flash & monitor
 
 ```sh
-cd ..
-go run ./cmd/baker -config configurations/7609.toml
+cargo espflash flash --monitor
 ```
-
-## Conventions
-
-- `edition = "2024"` everywhere.
-- Dependency versions are resolved with `cargo add` (latest) — never pinned from memory.
-- Lean on cargo-native esp tooling (`espup`, `esp-generate`, `cargo espflash`).
