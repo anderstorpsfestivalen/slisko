@@ -13,7 +13,7 @@ use log::{info, warn};
 
 use slisko_core::controller::Controller;
 
-use crate::generated_config as cfg;
+use slisko_config as cfg;
 
 type Shared = Arc<Mutex<Controller>>;
 

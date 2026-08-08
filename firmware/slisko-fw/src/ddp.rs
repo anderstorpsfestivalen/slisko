@@ -16,6 +16,7 @@ use ddp_rs::packet::PacketRef;
 use esp_idf_svc::sys::esp_timer_get_time;
 use log::{info, warn};
 
+use slisko_core::output::StrandMap;
 use slisko_core::pixel::Pixel;
 
 pub const DDP_PORT: u16 = 4048;
@@ -59,18 +60,9 @@ impl DdpState {
     }
 
     /// Paint the latest DDP RGB buffer into the strand.
-    pub fn apply(&self, leds: &mut [Pixel]) {
+    pub fn apply(&self, map: &StrandMap, leds: &mut [Pixel]) {
         let buf = self.rgb.lock().unwrap();
-        for (i, px) in leds.iter_mut().enumerate() {
-            let o = i * 3;
-            if o + 2 < buf.len() {
-                px.set_color(
-                    buf[o] as f32 / 255.0,
-                    buf[o + 1] as f32 / 255.0,
-                    buf[o + 2] as f32 / 255.0,
-                );
-            }
-        }
+        let _ = map.apply_rgb(&buf, leds);
     }
 
     fn ingest(&self, offset: usize, data: &[u8]) {

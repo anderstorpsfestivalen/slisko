@@ -13,8 +13,145 @@
 //! Lives in `slisko-core` (not the firmware) so it is `no_std` and host-tested.
 
 use alloc::vec::Vec;
+use core::fmt;
 
+use crate::chassi::Chassi;
 use crate::pixel::Pixel;
+
+/// One segment of the configured logical-chassis to physical-strand mapping.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MappingSegment {
+    /// Append every LED belonging to the given chassis card index.
+    Card(usize),
+    /// Append this many black physical pixels without a logical LED.
+    Gap(usize),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MappingError {
+    UnknownCard(usize),
+    TooManyPixels { mapped: usize, capacity: usize },
+    InvalidRgbLength { expected: usize, actual: usize },
+}
+
+impl fmt::Display for MappingError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            MappingError::UnknownCard(card) => write!(f, "mapping references unknown card {card}"),
+            MappingError::TooManyPixels { mapped, capacity } => write!(
+                f,
+                "mapping expands to {mapped} pixels but the strand has {capacity}"
+            ),
+            MappingError::InvalidRgbLength { expected, actual } => {
+                write!(f, "RGB frame has {actual} bytes, expected {expected}")
+            }
+        }
+    }
+}
+
+/// Reusable mapping between logical chassis pixels and the physical strand.
+///
+/// The vector stores one optional logical LED index per physical output pixel.
+/// Unmapped and generated positions are `None` and therefore render black.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct StrandMap {
+    physical_to_logical: Vec<Option<usize>>,
+}
+
+impl StrandMap {
+    pub fn new(
+        chassi: &Chassi,
+        segments: &[MappingSegment],
+        led_count: usize,
+    ) -> Result<Self, MappingError> {
+        let mut physical_to_logical = Vec::with_capacity(led_count);
+        for segment in segments {
+            match *segment {
+                MappingSegment::Card(card_idx) => {
+                    let card = chassi
+                        .linecards
+                        .get(card_idx)
+                        .ok_or(MappingError::UnknownCard(card_idx))?;
+                    physical_to_logical
+                        .extend((card.led_offset..card.led_offset + card.led_count).map(Some));
+                }
+                MappingSegment::Gap(count) => {
+                    physical_to_logical.extend(core::iter::repeat_n(None, count));
+                }
+            }
+            if physical_to_logical.len() > led_count {
+                return Err(MappingError::TooManyPixels {
+                    mapped: physical_to_logical.len(),
+                    capacity: led_count,
+                });
+            }
+        }
+        physical_to_logical.resize(led_count, None);
+        Ok(Self {
+            physical_to_logical,
+        })
+    }
+
+    pub fn len(&self) -> usize {
+        self.physical_to_logical.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.physical_to_logical.is_empty()
+    }
+
+    /// Copy logical pixels into a reusable physical-pixel buffer.
+    pub fn copy_pixels(&self, logical: &[Pixel], physical: &mut Vec<Pixel>) {
+        physical.clear();
+        physical.reserve(self.len());
+        for logical_idx in &self.physical_to_logical {
+            physical.push(
+                logical_idx
+                    .and_then(|idx| logical.get(idx).copied())
+                    .unwrap_or_else(Pixel::new),
+            );
+        }
+    }
+
+    /// Encode the mapped physical strand as tightly packed RGB8 bytes.
+    pub fn encode_rgb(&self, logical: &[Pixel], rgb: &mut Vec<u8>) {
+        rgb.clear();
+        rgb.reserve(self.len() * 3);
+        for logical_idx in &self.physical_to_logical {
+            let [r, g, b] = logical_idx
+                .and_then(|idx| logical.get(idx))
+                .map(Pixel::to_rgb8)
+                .unwrap_or([0, 0, 0]);
+            rgb.extend_from_slice(&[r, g, b]);
+        }
+    }
+
+    /// Apply one complete physical RGB8 frame back to the logical chassis.
+    /// LEDs absent from the physical mapping are blanked.
+    pub fn apply_rgb(&self, rgb: &[u8], logical: &mut [Pixel]) -> Result<(), MappingError> {
+        let expected = self.len() * 3;
+        if rgb.len() != expected {
+            return Err(MappingError::InvalidRgbLength {
+                expected,
+                actual: rgb.len(),
+            });
+        }
+        for pixel in logical.iter_mut() {
+            pixel.set_color(0.0, 0.0, 0.0);
+        }
+        for (physical_idx, logical_idx) in self.physical_to_logical.iter().enumerate() {
+            if let Some(pixel) = logical_idx.and_then(|idx| logical.get_mut(idx)) {
+                let offset = physical_idx * 3;
+                pixel.set_color(
+                    rgb[offset] as f32 / 255.0,
+                    rgb[offset + 1] as f32 / 255.0,
+                    rgb[offset + 2] as f32 / 255.0,
+                );
+            }
+        }
+        Ok(())
+    }
+}
 
 /// LED chip family. Parsed from the config `[ledinfo].type` string.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -135,12 +272,115 @@ pub fn encode_apa102(leds: &[Pixel], brightness: u8, out: &mut Vec<u8>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::chassi::LineCardSpec;
     use crate::pixel::Pixel;
+    use crate::pixel::Position;
 
     fn px(r: f32, g: f32, b: f32) -> Pixel {
         let mut p = Pixel::new();
         p.set_color(r, g, b);
         p
+    }
+
+    static CARD_A: &[Position] = &[
+        Position {
+            x: 0.0,
+            y: 0.0,
+            size: 1.0,
+        },
+        Position {
+            x: 1.0,
+            y: 0.0,
+            size: 1.0,
+        },
+    ];
+    static CARD_B: &[Position] = &[Position {
+        x: 2.0,
+        y: 0.0,
+        size: 1.0,
+    }];
+    static MAP_SPECS: &[LineCardSpec] = &[
+        LineCardSpec {
+            name: "A",
+            image: "",
+            active: true,
+            positions: CARD_A,
+            link: &[],
+            status: None,
+            labeled: &[],
+        },
+        LineCardSpec {
+            name: "B",
+            image: "",
+            active: true,
+            positions: CARD_B,
+            link: &[],
+            status: None,
+            labeled: &[],
+        },
+    ];
+
+    #[test]
+    fn strand_map_reorders_gaps_and_pads() {
+        let mut chassi = Chassi::from_specs(MAP_SPECS);
+        chassi.leds[0] = px(1.0, 0.0, 0.0);
+        chassi.leds[1] = px(0.0, 1.0, 0.0);
+        chassi.leds[2] = px(0.0, 0.0, 1.0);
+        let map = StrandMap::new(
+            &chassi,
+            &[
+                MappingSegment::Card(1),
+                MappingSegment::Gap(1),
+                MappingSegment::Card(0),
+            ],
+            5,
+        )
+        .unwrap();
+        let mut rgb = Vec::new();
+        map.encode_rgb(&chassi.leds, &mut rgb);
+        assert_eq!(
+            rgb,
+            alloc::vec![0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 0]
+        );
+    }
+
+    #[test]
+    fn strand_map_round_trips_and_blanks_unmapped_leds() {
+        let chassi = Chassi::from_specs(MAP_SPECS);
+        let map = StrandMap::new(&chassi, &[MappingSegment::Card(1)], 1).unwrap();
+        let mut target = chassi.leds.clone();
+        for pixel in &mut target {
+            pixel.set_color(1.0, 1.0, 1.0);
+        }
+        map.apply_rgb(&[10, 20, 30], &mut target).unwrap();
+        assert_eq!(target[0].to_rgb8(), [0, 0, 0]);
+        assert_eq!(target[1].to_rgb8(), [0, 0, 0]);
+        assert_eq!(target[2].to_rgb8(), [10, 20, 30]);
+    }
+
+    #[test]
+    fn strand_map_rejects_bad_config_and_frame_lengths() {
+        let chassi = Chassi::from_specs(MAP_SPECS);
+        assert_eq!(
+            StrandMap::new(&chassi, &[MappingSegment::Card(9)], 2),
+            Err(MappingError::UnknownCard(9))
+        );
+        assert_eq!(
+            StrandMap::new(&chassi, &[MappingSegment::Card(0)], 1),
+            Err(MappingError::TooManyPixels {
+                mapped: 2,
+                capacity: 1
+            })
+        );
+        let map = StrandMap::new(&chassi, &[MappingSegment::Gap(1)], 1).unwrap();
+        let mut pixels = chassi.leds.clone();
+        assert_eq!(
+            map.apply_rgb(&[], &mut pixels),
+            Err(MappingError::InvalidRgbLength {
+                expected: 3,
+                actual: 0
+            })
+        );
     }
 
     #[test]

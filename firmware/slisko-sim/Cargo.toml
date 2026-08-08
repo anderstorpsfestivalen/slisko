@@ -4,9 +4,11 @@ version = "0.1.0"
 edition.workspace = true
 license.workspace = true
 
-# Desktop simulator: runs slisko-core on the host and draws pixels at their
-# baked X/Y positions. Same render logic as the firmware. A window backend
-# (e.g. `minifb` / `pixels`) will be added with `cargo add` once the core
-# renderer lands; for now it's a headless smoke runner.
+# Persistent ggez DDP viewer. Kept outside the workspace's default members so
+# ordinary host/core tests do not compile the optional graphical stack.
 [dependencies]
+clap = { version = "4.6.6", features = ["derive"] }
+ddp-rs = "1.3.0"
+ggez = { version = "0.10.0", default-features = false }
+slisko-config = { version = "0.1.0", path = "../slisko-config" }
 slisko-core = { path = "../slisko-core" }

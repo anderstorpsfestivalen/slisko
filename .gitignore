@@ -22,5 +22,5 @@ yarn-error.log*
 assets/.DS_Store
 
 *.DS_Store
-slisko
-baker
+/slisko
+/baker

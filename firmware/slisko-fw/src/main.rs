@@ -1,6 +1,6 @@
 //! slisko firmware for the bong69 / WT32-ETH01 board (ESP32, esp-idf std).
 //!
-//! Boots from the baked `generated_config.rs` (chassis, active patterns, ledinfo
+//! Boots from the shared baked `slisko-config` crate (chassis, active patterns, ledinfo
 //! output map, shaper), brings up Ethernet (LAN8720) + SNTP, and runs the render
 //! loop driving the WS281x RMT channels off the monotonic esp_timer clock. The
 //! Controller is shared (Arc<Mutex>) so the HTTP control surface / DDP sink can
@@ -13,7 +13,6 @@ mod buttons;
 #[allow(dead_code)]
 mod apa102;
 mod ddp;
-mod generated_config;
 mod http;
 mod net;
 mod output;
@@ -31,10 +30,10 @@ use log::{info, warn};
 
 use slisko_core::chassi::Chassi;
 use slisko_core::controller::Controller;
-use slisko_core::output::LedType;
+use slisko_core::output::{LedType, StrandMap};
 use slisko_core::traffic::{Shaper, ShaperConfig};
 
-use generated_config as cfg;
+use slisko_config as cfg;
 use output::Ws281xOutput;
 
 const FPS: u32 = 60;
@@ -111,29 +110,30 @@ fn main() -> Result<(), EspError> {
 
     // --- Engine (shared) from the baked chassis + shaper ---
     let chassi = Chassi::from_specs(cfg::CHASSIS);
+    let strand_map = StrandMap::new(&chassi, cfg::OUTPUT_MAPPING, cfg::LED_COUNT)
+        .expect("baked output mapping must be valid");
     let seed = ((unsafe { esp_random() } as u64) << 32) | unsafe { esp_random() } as u64;
     let ctrl: Shared = Arc::new(Mutex::new(Controller::new(
         chassi,
         Shaper::new(shaper_config()),
         seed,
     )));
-    let num_leds;
     {
         let mut c = ctrl.lock().unwrap();
         for &name in cfg::ACTIVE_PATTERNS {
             c.enable(name);
         }
-        num_leds = c.leds().len();
         info!(
-            "engine up: {} leds, {} active patterns; free heap = {} bytes",
-            num_leds,
+            "engine up: {} logical leds, {} output leds, {} active patterns; free heap = {} bytes",
+            c.leds().len(),
+            cfg::LED_COUNT,
             cfg::ACTIVE_PATTERNS.len(),
             unsafe { esp_idf_svc::sys::esp_get_free_heap_size() }
         );
     }
 
     // --- DDP sink (external override of internal patterns) ---
-    let ddp_state = ddp::DdpState::new(num_leds);
+    let ddp_state = ddp::DdpState::new(cfg::LED_COUNT);
     ddp::spawn(ddp_state.clone());
 
     // --- Buttons (expansion-header pins) -> scene switching ---
@@ -160,6 +160,7 @@ fn main() -> Result<(), EspError> {
     let start_us = unsafe { esp_timer_get_time() };
     let frame_ms = (1000 / FPS).max(1);
     let mut sntp_logged = false;
+    let mut mapped_leds = Vec::with_capacity(cfg::LED_COUNT);
     loop {
         let now = (unsafe { esp_timer_get_time() } - start_us) as f32 / 1_000_000.0;
 
@@ -180,11 +181,12 @@ fn main() -> Result<(), EspError> {
             let mut c = ctrl.lock().unwrap();
             if ddp_state.active() {
                 // External source overrides internal patterns.
-                ddp_state.apply(c.leds_mut());
+                ddp_state.apply(&strand_map, c.leds_mut());
             } else {
                 c.tick(now);
             }
-            leds.write(c.leds())?;
+            strand_map.copy_pixels(c.leds(), &mut mapped_leds);
+            leds.write(&mapped_leds)?;
         }
         FreeRtos::delay_ms(frame_ms);
     }

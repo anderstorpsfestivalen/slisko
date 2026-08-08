@@ -2,8 +2,9 @@
 
 Two separate toolchains. You can do a lot with just the first.
 
-- **Host path** (`slisko-core` + `slisko-sim`): plain stable Rust. This is where
-  the render engine + patterns get written and tested. **No special tooling.**
+- **Host path** (`slisko-core` + `slisko-host` + optional `slisko-sim`): plain
+  stable Rust. This is where the render engine + patterns get written and
+  tested. **No special tooling.**
 - **Firmware path** (`slisko-fw`): the Xtensa ESP toolchain + ESP-IDF, only
   needed to build/flash the actual board.
 
@@ -19,7 +20,8 @@ You already have `cargo`/`rustc` 1.96 (rustup-managed). Nothing else to install.
 ```sh
 cd firmware
 cargo test               # slisko-core unit tests
-cargo run -p slisko-sim  # runs the engine on the host
+cargo run -p slisko-sim  # terminal 1: persistent ggez DDP viewer
+cargo run -p slisko-host # terminal 2: native pattern runner / DDP sender
 ```
 
 If `cargo` is NOT rustup-managed, install rustup first (it's also required for
@@ -122,8 +124,9 @@ Logs come over USB serial. Note GPIO1/3 double as UART0 **and** as LED outputs
 | Work | Needs board? | Toolchain |
 |------|--------------|-----------|
 | Render engine + patterns (`slisko-core`) | no | stable Rust |
-| Simulator (`slisko-sim`) | no | stable Rust |
-| The Go `baker` (config → `generated_config.rs`) | no | Go (already set up) |
+| Native pattern runner (`slisko-host`) | no | stable Rust |
+| Persistent ggez viewer (`slisko-sim`) | no | stable Rust |
+| The Go `baker` (config → `slisko-config/src/generated.rs`) | no | Go (already set up) |
 | Ethernet / RMT output / DDP sink (`slisko-fw`) | yes | ESP toolchain (section 2) |
 
 So: install section 2 when you want to flash. Everything else is buildable and

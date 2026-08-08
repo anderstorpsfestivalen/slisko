@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
+	"github.com/anderstorpsfestivalen/slisko/pkg/chassi"
 )
 
 func LoadFromFile(path string) (ChassiDefiniton, error) {
@@ -33,14 +34,14 @@ func LoadFromFile(path string) (ChassiDefiniton, error) {
 }
 
 type ChassiDefiniton struct {
-	LEDAmount      int64
-	Linecards      []string
-	Patterns       []string
-	Mapping        []MappingEntry `toml:"mapping"`
-	Buttons        []Button       `toml:"buttons"`
-	TrafficShaper  *TrafficShaper `toml:"traffic_shaper,omitempty"`
-	Output         *Output        `toml:"output,omitempty"`
-	LedInfo        *LedInfo       `toml:"ledinfo,omitempty"`
+	LEDAmount     int64
+	Linecards     []string
+	Patterns      []string
+	Mapping       []MappingEntry `toml:"mapping"`
+	Buttons       []Button       `toml:"buttons"`
+	TrafficShaper *TrafficShaper `toml:"traffic_shaper,omitempty"`
+	Output        *Output        `toml:"output,omitempty"`
+	LedInfo       *LedInfo       `toml:"ledinfo,omitempty"`
 }
 
 // LedInfo describes the physical LED hardware: the pixel chip type and the
@@ -106,22 +107,22 @@ func (o *Output) HasDDP() bool {
 
 type TrafficShaper struct {
 	Enabled    bool    `toml:"enabled"`
-	PeakStart  int     `toml:"peak_start"`   // Hour of day (0-23), e.g., 17 for 5 PM
-	PeakEnd    int     `toml:"peak_end"`     // Hour of day (0-23), e.g., 22 for 10 PM
-	LowStart   int     `toml:"low_start"`    // Hour of day (0-23), e.g., 2 for 2 AM
-	LowEnd     int     `toml:"low_end"`      // Hour of day (0-23), e.g., 7 for 7 AM
-	PeakFactor float64 `toml:"peak_factor"`  // Multiplier during peak hours (1.0 = baseline/maximum as defined in styles)
-	LowFactor  float64 `toml:"low_factor"`   // Multiplier during low hours (0.0-1.0, e.g., 0.2 = 20% of peak)
+	PeakStart  int     `toml:"peak_start"`  // Hour of day (0-23), e.g., 17 for 5 PM
+	PeakEnd    int     `toml:"peak_end"`    // Hour of day (0-23), e.g., 22 for 10 PM
+	LowStart   int     `toml:"low_start"`   // Hour of day (0-23), e.g., 2 for 2 AM
+	LowEnd     int     `toml:"low_end"`     // Hour of day (0-23), e.g., 7 for 7 AM
+	PeakFactor float64 `toml:"peak_factor"` // Multiplier during peak hours (1.0 = baseline/maximum as defined in styles)
+	LowFactor  float64 `toml:"low_factor"`  // Multiplier during low hours (0.0-1.0, e.g., 0.2 = 20% of peak)
 }
 
 // DefaultTrafficShaper returns a TrafficShaper with sensible defaults
 func DefaultTrafficShaper() *TrafficShaper {
 	return &TrafficShaper{
 		Enabled:    true,
-		PeakStart:  17, // 5 PM
-		PeakEnd:    22, // 10 PM
-		LowStart:   2,  // 2 AM
-		LowEnd:     7,  // 7 AM
+		PeakStart:  17,  // 5 PM
+		PeakEnd:    22,  // 10 PM
+		LowStart:   2,   // 2 AM
+		LowEnd:     7,   // 7 AM
 		PeakFactor: 1.0, // Peak is baseline (maximum blinking as defined in styles)
 		LowFactor:  0.2, // Low period is 20% of peak
 	}
@@ -173,11 +174,27 @@ func (c *ChassiDefiniton) UsesButtons() bool {
 // Validate checks that the configuration is internally consistent and safe to use
 func (c *ChassiDefiniton) Validate() error {
 	numLinecards := len(c.Linecards)
+	cards := chassi.CardsFromDefinition(c.Linecards)
+	if len(cards) != numLinecards {
+		return fmt.Errorf("one or more linecard types are unknown: %v", c.Linecards)
+	}
+	mappedLEDs := int64(0)
 
 	// Validate mapping entries
 	for i, mapping := range c.Mapping {
 		if err := validateMappingEntry(mapping, i, numLinecards); err != nil {
 			return err
+		}
+		if mapping.IsGen() {
+			mappedLEDs += int64(*mapping.Gen)
+		} else {
+			if *mapping.Card >= len(cards) {
+				return fmt.Errorf("mapping[%d]: card index %d has no generated linecard", i, *mapping.Card)
+			}
+			mappedLEDs += int64(len(cards[*mapping.Card].LEDs))
+		}
+		if mappedLEDs > c.LEDAmount {
+			return fmt.Errorf("mapping expands to %d LEDs at entry %d, exceeding LEDAmount %d", mappedLEDs, i, c.LEDAmount)
 		}
 	}
 
@@ -225,6 +242,9 @@ func validateMappingEntry(m MappingEntry, index int, numLinecards int) error {
 	// Check if mapping entry has at least one field set
 	if !m.IsCard() && !m.IsGen() {
 		return fmt.Errorf("mapping[%d]: must specify either 'card' or 'gen'", index)
+	}
+	if m.IsCard() && m.IsGen() {
+		return fmt.Errorf("mapping[%d]: must not specify both 'card' and 'gen'", index)
 	}
 
 	// Validate card index if present

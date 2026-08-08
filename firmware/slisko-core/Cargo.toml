@@ -5,7 +5,7 @@ edition.workspace = true
 license.workspace = true
 
 # Portable render engine. no_std + alloc so it compiles for the ESP32; tests
-# and the host simulator pull in std via the test harness / the std `slisko-sim`
+# and the host runner pull in std via the test harness / the std `slisko-host`
 # crate. Dependencies are added with `cargo add` (latest), never pinned by hand.
 [dependencies]
 libm = "0.2.16"

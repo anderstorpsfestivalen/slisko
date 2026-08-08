@@ -60,3 +60,44 @@ func TestLedInfoValidation(t *testing.T) {
 		t.Errorf("valid LedInfo rejected: %v", err)
 	}
 }
+
+func TestOutputMappingCannotExceedLEDAmount(t *testing.T) {
+	card := 0
+	gap := 10
+
+	tooSmallForCard := ChassiDefiniton{
+		LEDAmount: 1,
+		Linecards: []string{"a9k-8t-l"},
+		Mapping:   []MappingEntry{{Card: &card}},
+	}
+	if err := tooSmallForCard.Validate(); err == nil {
+		t.Fatal("expected an oversized card mapping to fail validation")
+	}
+
+	tooSmallForGap := ChassiDefiniton{
+		LEDAmount: 5,
+		Linecards: []string{"blank"},
+		Mapping:   []MappingEntry{{Gen: &gap}},
+	}
+	if err := tooSmallForGap.Validate(); err == nil {
+		t.Fatal("expected an oversized generated gap to fail validation")
+	}
+
+	exact := ChassiDefiniton{
+		LEDAmount: 9,
+		Linecards: []string{"a9k-8t-l"},
+		Mapping:   []MappingEntry{{Card: &card}},
+	}
+	if err := exact.Validate(); err != nil {
+		t.Fatalf("valid exact-length mapping rejected: %v", err)
+	}
+
+	both := ChassiDefiniton{
+		LEDAmount: 9,
+		Linecards: []string{"a9k-8t-l"},
+		Mapping:   []MappingEntry{{Card: &card, Gen: &gap}},
+	}
+	if err := both.Validate(); err == nil {
+		t.Fatal("expected a mapping containing both card and gen to fail validation")
+	}
+}
