@@ -62,6 +62,52 @@ impl FailureWindow {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ButtonEdge {
+    Pressed,
+    Released,
+}
+
+/// Time-based active-low button debounce. An edge is emitted only after the
+/// raw input remains unchanged for the configured interval.
+#[derive(Clone, Copy, Debug)]
+pub struct ActiveLowDebouncer {
+    debounce_ms: u64,
+    sampled_low: bool,
+    stable_low: bool,
+    sample_changed_ms: u64,
+}
+
+impl ActiveLowDebouncer {
+    pub const fn new(debounce_ms: u64) -> Self {
+        Self {
+            debounce_ms,
+            sampled_low: false,
+            stable_low: false,
+            sample_changed_ms: 0,
+        }
+    }
+
+    pub fn update(&mut self, low: bool, now_ms: u64) -> Option<ButtonEdge> {
+        if low != self.sampled_low {
+            self.sampled_low = low;
+            self.sample_changed_ms = now_ms;
+        }
+        if self.sampled_low == self.stable_low
+            || now_ms.saturating_sub(self.sample_changed_ms) < self.debounce_ms
+        {
+            return None;
+        }
+
+        self.stable_low = self.sampled_low;
+        Some(if self.stable_low {
+            ButtonEdge::Pressed
+        } else {
+            ButtonEdge::Released
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -93,5 +139,19 @@ mod tests {
         failures.record_success();
         assert_eq!(failures.consecutive(), 0);
         assert!(!failures.expired(10_000, 1_000));
+    }
+
+    #[test]
+    fn button_debounce_rejects_bounce_and_emits_one_edge_per_stable_change() {
+        let mut button = ActiveLowDebouncer::new(30);
+        assert_eq!(button.update(true, 0), None);
+        assert_eq!(button.update(false, 10), None);
+        assert_eq!(button.update(true, 20), None);
+        assert_eq!(button.update(true, 49), None);
+        assert_eq!(button.update(true, 50), Some(ButtonEdge::Pressed));
+        assert_eq!(button.update(true, 500), None);
+        assert_eq!(button.update(false, 510), None);
+        assert_eq!(button.update(false, 540), Some(ButtonEdge::Released));
+        assert_eq!(button.update(false, 1_000), None);
     }
 }

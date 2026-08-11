@@ -29,6 +29,8 @@ Length: 11
 Skip first LED: TRUE
 LED TYPE: WS281x
 Start: 59
+GPIO BUTTON: 17
+GPIO BUTTON: 32
 
 # Port 5
 GPIO 5
@@ -37,6 +39,8 @@ Length: 11
 Skip first LED: TRUE
 LED TYPE: WS281x
 Start: 70
+GPIO BUTTON: 33
+GPIO BUTTON: 34
 
 # Port 6
 GPIO 12

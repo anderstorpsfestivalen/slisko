@@ -260,7 +260,7 @@ fn run() -> Result<(), EspError> {
             }
         }
 
-        buttons.poll(now_ms, &ctrl);
+        buttons.poll(now_ms);
         {
             let mut controller = lock_recover(&ctrl);
             if ddp_state.active() {

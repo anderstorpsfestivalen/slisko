@@ -1,23 +1,24 @@
-//! GPIO buttons → scene switching, polled by the render task so button GPIO
+//! Active-low GPIO buttons, polled and debounced by the render task so GPIO
 //! ownership cannot be stranded in a failed worker thread.
 
-use std::sync::{Arc, Mutex};
-
 use esp_idf_hal::gpio::{AnyInputPin, Input, PinDriver, Pull};
-use log::{info, warn};
-
-use engine::controller::Controller;
+use log::{debug, info, warn};
 
 use config as cfg;
+use config::ButtonAction;
 
-use crate::health::{Health, ServiceState, lock_recover};
+use crate::health::{Health, ServiceState};
+use crate::recovery::{ActiveLowDebouncer, ButtonEdge};
 
-type Shared = Arc<Mutex<Controller>>;
+const POLL_INTERVAL_MS: u64 = 10;
+const DEBOUNCE_MS: u64 = 30;
 
 struct Btn {
+    name: &'static str,
     pin: PinDriver<'static, Input>,
-    scene: &'static [&'static str],
-    last_low: bool,
+    action: ButtonAction,
+    patterns: &'static [&'static str],
+    debouncer: ActiveLowDebouncer,
 }
 
 pub struct Buttons {
@@ -30,34 +31,43 @@ impl Buttons {
     pub fn new(mut header_pins: Vec<(u8, AnyInputPin<'static>)>, health: Health) -> Self {
         let mut btns = Vec::new();
         for b in cfg::BUTTONS {
-            if b.scene.is_empty() {
-                continue;
-            }
             let Some(pos) = header_pins.iter().position(|(g, _)| *g == b.gpio) else {
                 warn!(
-                    "button GPIO{} is not an available header pin; skipping",
-                    b.gpio
+                    "button {}: GPIO{} is not an available header pin; skipping",
+                    b.name, b.gpio
                 );
                 continue;
             };
             let (gpio, pin) = header_pins.remove(pos);
             let pull = if matches!(gpio, 34..=36) {
+                warn!(
+                    "button {}: GPIO{} has no internal pull-up; external pull-up to 3.3V required",
+                    b.name, gpio
+                );
                 Pull::Floating
             } else {
                 Pull::Up
             };
             match PinDriver::input(pin, pull) {
                 Ok(pin) => {
-                    info!("button: GPIO{} -> {:?}", gpio, b.scene);
+                    info!(
+                        "button: {} on GPIO{} (active-low, {:?}, patterns {:?})",
+                        b.name, gpio, b.action, b.patterns
+                    );
                     btns.push(Btn {
+                        name: b.name,
                         pin,
-                        scene: b.scene,
-                        last_low: false,
+                        action: b.action,
+                        patterns: b.patterns,
+                        debouncer: ActiveLowDebouncer::new(DEBOUNCE_MS),
                     });
                 }
                 Err(error) => {
-                    warn!("button GPIO{} init failed: {error:?}", gpio);
-                    health.record_error(format!("button GPIO{gpio} init failed: {error:?}"));
+                    warn!("button {} on GPIO{} init failed: {error:?}", b.name, gpio);
+                    health.record_error(format!(
+                        "button {} on GPIO{gpio} init failed: {error:?}",
+                        b.name
+                    ));
                 }
             }
         }
@@ -73,23 +83,27 @@ impl Buttons {
         }
     }
 
-    pub fn poll(&mut self, now_ms: u64, ctrl: &Shared) {
+    pub fn poll(&mut self, now_ms: u64) {
         if now_ms < self.next_poll_ms {
             return;
         }
-        self.next_poll_ms = now_ms.saturating_add(30);
+        self.next_poll_ms = now_ms.saturating_add(POLL_INTERVAL_MS);
 
         for button in &mut self.btns {
             let low = button.pin.is_low();
-            if low && !button.last_low {
-                let mut controller = lock_recover(ctrl);
-                controller.clear();
-                for &pattern in button.scene {
-                    controller.enable(pattern);
+            match button.debouncer.update(low, now_ms) {
+                Some(ButtonEdge::Pressed) => {
+                    info!("BUTTON {} pressed", button.name);
+                    debug!(
+                        "button action {:?}, patterns {:?}",
+                        button.action, button.patterns
+                    );
                 }
-                info!("button pressed -> {:?}", button.scene);
+                Some(ButtonEdge::Released) => {
+                    debug!("BUTTON {} released", button.name);
+                }
+                None => {}
             }
-            button.last_low = low;
         }
         self.health
             .update(|state| state.buttons = ServiceState::Running);

@@ -7,6 +7,7 @@ use alloc::vec::Vec;
 use crate::chassi::Chassi;
 use crate::faker::{Fake, RandomBlinker, RandomInterval, Rng};
 use crate::pattern::{BootstrapCtx, Pattern, PatternInfo, RenderInfo};
+use crate::patterns::blinkstyle::CISCO7609_HEALTHY_COLOR;
 use crate::utils;
 
 fn ri(
@@ -148,8 +149,20 @@ impl Pattern for SUP720 {
         set_all(c, &self.mgmt, 1.0, 0.0, 0.0);
         set_all(c, &self.disk0_led, 0.0, d0, 0.0);
         set_all(c, &self.disk1_led, 0.0, d1, 0.0);
-        set_all(c, &self.p1, 0.7 * p0v, 0.5 * p0v, 0.0);
-        set_all(c, &self.p2, 0.7 * p1v, 0.5 * p1v, 0.0);
+        set_all(
+            c,
+            &self.p1,
+            CISCO7609_HEALTHY_COLOR.r * p0v,
+            CISCO7609_HEALTHY_COLOR.g * p0v,
+            CISCO7609_HEALTHY_COLOR.b * p0v,
+        );
+        set_all(
+            c,
+            &self.p2,
+            CISCO7609_HEALTHY_COLOR.r * p1v,
+            CISCO7609_HEALTHY_COLOR.g * p1v,
+            CISCO7609_HEALTHY_COLOR.b * p1v,
+        );
     }
     fn info(&self) -> PatternInfo {
         PatternInfo {
@@ -170,5 +183,53 @@ impl Pattern for SUP720 {
         self.disk1_led = c.leds_with_label_on_type(ty, "disk1");
         self.p1 = c.leds_with_label_on_type(ty, "p1");
         self.p2 = c.leds_with_label_on_type(ty, "p2");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::chassi::LineCardSpec;
+    use crate::pixel::Position;
+
+    static POSITIONS: &[Position] = &[
+        Position {
+            x: 0.0,
+            y: 0.0,
+            size: 1.0,
+        },
+        Position {
+            x: 1.0,
+            y: 0.0,
+            size: 1.0,
+        },
+        Position {
+            x: 2.0,
+            y: 0.0,
+            size: 1.0,
+        },
+    ];
+    static SPEC: &[LineCardSpec] = &[LineCardSpec {
+        name: "sup720",
+        image: "",
+        active: true,
+        positions: POSITIONS,
+        link: &[1, 2],
+        status: None,
+        labeled: &[],
+    }];
+
+    #[test]
+    fn sup720_blinking_ports_have_no_red_channel() {
+        let mut chassis = Chassi::from_specs(SPEC);
+        let mut pattern = SUP720::default();
+        pattern.mgmt.push(0);
+        pattern.p1.push(1);
+        pattern.p2.push(2);
+
+        pattern.render(&RenderInfo::default(), &mut chassis);
+        assert_eq!(chassis.leds[0].to_srgb8(), [255, 0, 0]);
+        assert_eq!(chassis.leds[1].to_srgb8(), [0, 255, 0]);
+        assert_eq!(chassis.leds[2].to_srgb8(), [0, 255, 0]);
     }
 }

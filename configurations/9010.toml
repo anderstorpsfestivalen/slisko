@@ -35,18 +35,13 @@ Mapping = [
 Patterns = ["greenstatus", "a9k-40ge-l", "a9k-8t-l", "a9k-rsp440-tr"]
 #Patterns = ["mapper"]
 Buttons = [
-    { pin = "GPIO23", action = [
-        "greenstatus",
-        "a9k-8t-l",
-        "a9k-40ge-l",
-        "a9k-rsp440-tr",
-    ] },
-    { pin = "GPIO24", action = [
-    ] },
-    { pin = "GPIO25", action = [
-    ] },
-    { pin = "GPIO16", action = [
-    ] },
+    # Port 4 / first RSP. The first GPIO listed in the wiring notes is ACO.
+    { name = "RSP1 ACO",       pin = "GPIO17", action = "change", patterns = [] },
+    { name = "RSP1 LAMP TEST", pin = "GPIO32", action = "hold",   patterns = [] },
+    # Port 5 / second RSP.
+    { name = "RSP2 ACO",       pin = "GPIO33", action = "change", patterns = [] },
+    # GPIO34 has no ESP32 internal pull-up and needs an external resistor.
+    { name = "RSP2 LAMP TEST", pin = "GPIO34", action = "hold",   patterns = [] },
 ]
 
 [traffic_shaper]
@@ -65,7 +60,8 @@ port = 4048
 [ledinfo]
 type = "WS2815"
 mapping = [
-    { data = 1,  range = "0-42" },
+    # GPIO1 / port 1 is deliberately disabled during button bring-up so UART0
+    # TX remains available for serial press logs.
     { data = 2,  range = "42-51" },
     { data = 3,  range = "51-60" },
     { data = 4,  range = "60-72" },
@@ -76,7 +72,7 @@ mapping = [
 ]
 
 # Physical output sequence (half-open ranges)
-# GPIO 1:  skip + a9k40       0-42
+# GPIO 1:  disabled for UART0 TX during button bring-up
 # GPIO 2:  8t                42-51
 # GPIO 3:  8t                51-60
 # GPIO 4:  skip + rsp        60-72

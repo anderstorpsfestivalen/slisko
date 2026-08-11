@@ -199,12 +199,23 @@ impl BakedConfig {
             }
         });
         let buttons = self.buttons.iter().map(|button| {
+            let name = LitStr::new(&button.name, Span::call_site());
             let gpio = Literal::u8_unsuffixed(button.gpio);
-            let scene = button
-                .scene
+            let action = match button.action {
+                BakedButtonAction::Change => quote!(ButtonAction::Change),
+                BakedButtonAction::Momentary => quote!(ButtonAction::Momentary),
+                BakedButtonAction::Hold => quote!(ButtonAction::Hold),
+            };
+            let patterns = button
+                .patterns
                 .iter()
                 .map(|pattern| LitStr::new(pattern, Span::call_site()));
-            quote!(Button { gpio: #gpio, scene: &[#(#scene),*] })
+            quote!(Button {
+                name: #name,
+                gpio: #gpio,
+                action: #action,
+                patterns: &[#(#patterns),*],
+            })
         });
         let led_count = Literal::usize_unsuffixed(self.led_count);
         let enabled = self.shaper.enabled;
@@ -216,7 +227,7 @@ impl BakedConfig {
         let low_factor = Literal::f32_unsuffixed(self.shaper.low_factor);
 
         let tokens = quote! {
-            use crate::{Button, LedDriver, LedOutput};
+            use crate::{Button, ButtonAction, LedDriver, LedOutput};
             use engine::chassi::LineCardSpec;
             use engine::output::MappingSegment;
             use engine::pixel::Position;
@@ -439,12 +450,31 @@ fn validate_and_expand(source: &Path, raw: RawConfig) -> Result<BakedConfig> {
     shaper.validate()?;
 
     let mut buttons = Vec::with_capacity(raw.buttons.len());
+    let mut button_names = BTreeSet::new();
+    let mut button_gpios = BTreeSet::new();
     for (index, button) in raw.buttons.into_iter().enumerate() {
+        let field = format!("Buttons[{index}]");
+        if button.name.trim().is_empty() {
+            return Err(BakeError::new(format!("{field}.name: must not be empty")));
+        }
+        if !button_names.insert(button.name.clone()) {
+            return Err(BakeError::new(format!(
+                "{field}.name: duplicate button name {:?}",
+                button.name
+            )));
+        }
         let gpio = parse_gpio(&button.pin, &format!("Buttons[{index}].pin"))?;
-        validate_patterns(&format!("Buttons[{index}].action"), &button.action)?;
+        if !button_gpios.insert(gpio) {
+            return Err(BakeError::new(format!(
+                "{field}.pin: GPIO{gpio} is used by more than one button"
+            )));
+        }
+        validate_patterns(&format!("{field}.patterns"), &button.patterns)?;
         buttons.push(Button {
+            name: button.name,
             gpio,
-            scene: button.action,
+            action: button.action.into(),
+            patterns: button.patterns,
         });
     }
 
@@ -538,9 +568,29 @@ struct RawMapping {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawButton {
+    name: String,
     pin: String,
+    action: RawButtonAction,
     #[serde(default)]
-    action: Vec<String>,
+    patterns: Vec<String>,
+}
+
+#[derive(Clone, Copy, Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum RawButtonAction {
+    Change,
+    Momentary,
+    Hold,
+}
+
+impl From<RawButtonAction> for BakedButtonAction {
+    fn from(value: RawButtonAction) -> Self {
+        match value {
+            RawButtonAction::Change => Self::Change,
+            RawButtonAction::Momentary => Self::Momentary,
+            RawButtonAction::Hold => Self::Hold,
+        }
+    }
 }
 
 #[derive(Deserialize)]
@@ -669,9 +719,18 @@ enum BakedLedOutput {
     },
 }
 
+#[derive(Clone, Copy)]
+enum BakedButtonAction {
+    Change,
+    Momentary,
+    Hold,
+}
+
 struct Button {
+    name: String,
     gpio: u8,
-    scene: Vec<String>,
+    action: BakedButtonAction,
+    patterns: Vec<String>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -1024,7 +1083,6 @@ mod tests {
         assert_eq!(
             outputs,
             vec![
-                (1, 0, 42),
                 (2, 42, 51),
                 (3, 51, 60),
                 (4, 60, 72),
@@ -1034,7 +1092,16 @@ mod tests {
                 (15, 102, 145),
             ]
         );
-        assert_eq!(baked.buttons[0].scene[3], "a9k-rsp440-tr");
+        assert_eq!(baked.buttons.len(), 4);
+        assert_eq!(baked.buttons[0].name, "RSP1 ACO");
+        assert_eq!(baked.buttons[0].gpio, 17);
+        assert!(matches!(baked.buttons[1].action, BakedButtonAction::Hold));
+        assert!(
+            baked
+                .buttons
+                .iter()
+                .all(|button| button.patterns.is_empty())
+        );
         let rendered = baked.render();
         syn::parse_file(&rendered).expect("rendered 9010 configuration must be valid Rust");
         assert!(rendered.contains("pub const LED_COUNT: usize = 145;"));
@@ -1083,12 +1150,36 @@ mod tests {
             LEDAmount = 1
             Linecards = ["blank"]
             Mapping = [{ gen = 1 }]
-            Buttons = [{ pin = "GPIO1", action = ["not-a-pattern"] }]
+            Buttons = [
+                { name = "test", pin = "GPIO1", action = "change", patterns = ["not-a-pattern"] },
+            ]
         "#;
         let error = bake_text(Path::new("bad.toml"), input)
             .err()
             .expect("configuration should be rejected");
-        assert!(error.to_string().contains("Buttons[0].action[0]"));
+        assert!(error.to_string().contains("Buttons[0].patterns[0]"));
+    }
+
+    #[test]
+    fn bakes_all_button_action_kinds() {
+        let input = r#"
+            LEDAmount = 1
+            Linecards = ["blank"]
+            Mapping = [{ gen = 1 }]
+            Buttons = [
+                { name = "change", pin = "GPIO17", action = "change", patterns = ["greenstatus"] },
+                { name = "momentary", pin = "GPIO32", action = "momentary", patterns = [] },
+                { name = "hold", pin = "GPIO33", action = "hold", patterns = [] },
+            ]
+        "#;
+        let baked = bake_text(Path::new("buttons.toml"), input).unwrap();
+        assert!(matches!(baked.buttons[0].action, BakedButtonAction::Change));
+        assert!(matches!(
+            baked.buttons[1].action,
+            BakedButtonAction::Momentary
+        ));
+        assert!(matches!(baked.buttons[2].action, BakedButtonAction::Hold));
+        assert_eq!(baked.buttons[0].patterns, ["greenstatus"]);
     }
 
     #[test]

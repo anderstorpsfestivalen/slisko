@@ -36,9 +36,18 @@ impl LedOutput {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ButtonAction {
+    Change,
+    Momentary,
+    Hold,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Button {
+    pub name: &'static str,
     pub gpio: u8,
-    pub scene: &'static [&'static str],
+    pub action: ButtonAction,
+    pub patterns: &'static [&'static str],
 }
 
 #[allow(clippy::all)]

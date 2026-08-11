@@ -12,9 +12,6 @@ use crate::pattern::BootstrapCtx;
 use crate::pixel::Pixel;
 use crate::utils;
 
-/// Cisco 7609 link LEDs use solid red to mean a down/dead port.
-pub const CISCO7609_DEAD_PORT_CHANCE: f32 = 0.03;
-
 /// RGB multipliers (0.0..1.0), mirrors `ColorStyle`.
 #[derive(Clone, Copy, Debug)]
 pub struct ColorStyle {
@@ -22,6 +19,28 @@ pub struct ColorStyle {
     pub g: f32,
     pub b: f32,
 }
+
+/// Cisco 7609 link LEDs use solid red to mean a down/dead port. Healthy ports
+/// are green for gigabit or orange for 100 Mbit/s.
+pub const CISCO7609_DEAD_PORT_CHANCE: f32 = 0.03;
+pub const CISCO7609_HEALTHY_COLOR: ColorStyle = ColorStyle {
+    r: 0.0,
+    g: 1.0,
+    b: 0.0,
+};
+pub const CISCO7609_100MBIT_COLOR: ColorStyle = ColorStyle {
+    r: 1.0,
+    // This is perceptual sRGB and is linearized before APA102 output. A high
+    // green component keeps the result visibly orange rather than red.
+    g: 0.8,
+    b: 0.0,
+};
+pub const CISCO7609_100MBIT_PORT_CHANCE: f32 = 0.05;
+
+// `slow_speed_chance` is sampled only after a port survives the dead-port
+// roll, so compensate to keep the unconditional orange population at 5%.
+const CISCO7609_100MBIT_SURVIVOR_CHANCE: f32 =
+    CISCO7609_100MBIT_PORT_CHANCE / (1.0 - CISCO7609_DEAD_PORT_CHANCE);
 
 /// Mirrors `BlinkStyle`. Timing fields are seconds.
 #[derive(Clone, Copy, Debug)]
@@ -154,23 +173,15 @@ pub fn cisco7609_style() -> BlinkStyle {
         max_blinks: 40.0,
         min_cycle: 1.0,
         max_cycle: 10.0,
-        slow_color: ColorStyle {
-            r: 1.0,
-            g: 0.5,
-            b: 0.0,
-        },
-        fast_color: ColorStyle {
-            r: 0.3,
-            g: 1.0,
-            b: 0.0,
-        },
+        slow_color: CISCO7609_100MBIT_COLOR,
+        fast_color: CISCO7609_HEALTHY_COLOR,
         dead_color: ColorStyle {
             r: 1.0,
             g: 0.0,
             b: 0.0,
         },
         dead_port_chance: CISCO7609_DEAD_PORT_CHANCE,
-        slow_speed_chance: 0.2,
+        slow_speed_chance: CISCO7609_100MBIT_SURVIVOR_CHANCE,
     }
 }
 
@@ -180,9 +191,36 @@ mod tests {
     use crate::faker::Rng;
 
     #[test]
-    fn cisco_dead_ports_are_three_percent_and_solid_red() {
+    fn cisco_port_populations_and_colors_match_link_semantics() {
         let style = cisco7609_style();
         assert_eq!(style.dead_port_chance, 0.03);
+        assert!(((1.0 - style.dead_port_chance) * style.slow_speed_chance - 0.05).abs() < 1e-6);
+        assert_eq!(style.slow_color.r, 1.0);
+        assert_eq!(style.slow_color.g, 0.8);
+        assert_eq!(style.slow_color.b, 0.0);
+        assert_eq!(style.fast_color.r, 0.0);
+        assert_eq!(style.fast_color.g, 1.0);
+        assert_eq!(style.fast_color.b, 0.0);
+
+        let mut always_100mbit = style;
+        always_100mbit.dead_port_chance = 0.0;
+        always_100mbit.slow_speed_chance = 1.0;
+        let mut rng = Rng::new(7);
+        let mut ctx = BootstrapCtx {
+            rng: &mut rng,
+            intensity: 1.0,
+        };
+        let port = always_100mbit.create_port(0, &mut ctx);
+        assert!(!port.is_dead);
+        assert!(port.faker.is_some());
+        assert_eq!(port.style.r, 1.0);
+        assert_eq!(port.style.g, 0.8);
+        assert_eq!(port.style.b, 0.0);
+    }
+
+    #[test]
+    fn cisco_dead_ports_are_solid_red_without_a_faker() {
+        let style = cisco7609_style();
 
         let mut always_dead = style;
         always_dead.dead_port_chance = 1.0;

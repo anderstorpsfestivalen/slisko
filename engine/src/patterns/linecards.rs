@@ -9,7 +9,8 @@ use crate::chassi::Chassi;
 use crate::faker::{Fake, RandomBlinker, RandomInterval, Rng};
 use crate::pattern::{BootstrapCtx, Pattern, PatternInfo, RenderInfo};
 use crate::patterns::blinkstyle::{
-    BlinkStyle, CISCO7609_DEAD_PORT_CHANCE, PortState, asr9000_style, cisco7609_style,
+    BlinkStyle, CISCO7609_DEAD_PORT_CHANCE, CISCO7609_HEALTHY_COLOR, PortState, asr9000_style,
+    cisco7609_style,
 };
 use crate::utils;
 
@@ -107,7 +108,11 @@ impl Pattern for X6704 {
     fn render(&mut self, info: &RenderInfo, c: &mut Chassi) {
         for p in &mut self.ports {
             let v = utils::invert(p.faker.trig(info.millis));
-            c.leds[p.port].set_clamped(v * 0.3, v * 1.0, 0.0);
+            c.leds[p.port].set_clamped(
+                v * CISCO7609_HEALTHY_COLOR.r,
+                v * CISCO7609_HEALTHY_COLOR.g,
+                v * CISCO7609_HEALTHY_COLOR.b,
+            );
         }
         for &idx in &self.dead {
             c.leds[idx].set_clamped(1.0, 0.0, 0.0);
