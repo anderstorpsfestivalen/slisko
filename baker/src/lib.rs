@@ -1098,7 +1098,11 @@ mod tests {
         assert_eq!(baked.buttons[0].gpio, 17);
         assert_eq!(baked.buttons[1].name, "RSP1 ACO");
         assert_eq!(baked.buttons[1].gpio, 33);
-        assert_eq!(baked.buttons[1].patterns, ["rainbow"]);
+        assert!(matches!(
+            baked.buttons[1].action,
+            BakedButtonAction::Momentary
+        ));
+        assert_eq!(baked.buttons[1].patterns, ["strobe"]);
         assert!(matches!(
             baked.buttons[2].action,
             BakedButtonAction::Momentary
