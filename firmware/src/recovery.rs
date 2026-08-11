@@ -1,5 +1,7 @@
 //! Small, platform-neutral recovery state machines used by the firmware.
 
+use config::ButtonAction;
+
 #[derive(Clone, Copy, Debug)]
 pub struct ExponentialBackoff {
     initial_ms: u64,
@@ -108,6 +110,45 @@ impl ActiveLowDebouncer {
     }
 }
 
+struct MomentaryScene {
+    button_index: usize,
+    restore_patterns: Vec<&'static str>,
+}
+
+/// Tracks which scene a momentary button must restore. A later non-momentary
+/// press cancels that restoration so releasing an older button cannot undo the
+/// newly selected scene.
+#[derive(Default)]
+pub struct ButtonSceneState {
+    momentary: Option<MomentaryScene>,
+}
+
+impl ButtonSceneState {
+    pub fn press(
+        &mut self,
+        button_index: usize,
+        action: ButtonAction,
+        current_patterns: &[&'static str],
+    ) {
+        let previous = self.momentary.take();
+        if action == ButtonAction::Momentary {
+            self.momentary = Some(MomentaryScene {
+                button_index,
+                restore_patterns: previous.map_or_else(
+                    || current_patterns.to_vec(),
+                    |active| active.restore_patterns,
+                ),
+            });
+        }
+    }
+
+    pub fn release(&mut self, button_index: usize) -> Option<Vec<&'static str>> {
+        self.momentary
+            .take_if(|active| active.button_index == button_index)
+            .map(|active| active.restore_patterns)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -153,5 +194,28 @@ mod tests {
         assert_eq!(button.update(false, 510), None);
         assert_eq!(button.update(false, 540), Some(ButtonEdge::Released));
         assert_eq!(button.update(false, 1_000), None);
+    }
+
+    #[test]
+    fn momentary_scene_restores_only_if_it_is_still_the_active_override() {
+        let defaults = ["greenstatus", "a9k-8t-l"];
+        let mut scenes = ButtonSceneState::default();
+
+        scenes.press(0, ButtonAction::Momentary, &defaults);
+        assert_eq!(scenes.release(0).unwrap(), defaults);
+
+        scenes.press(0, ButtonAction::Momentary, &defaults);
+        scenes.press(1, ButtonAction::Hold, &["lamp-test"]);
+        assert_eq!(scenes.release(0), None);
+    }
+
+    #[test]
+    fn nested_momentary_scenes_preserve_the_original_scene() {
+        let defaults = ["greenstatus"];
+        let mut scenes = ButtonSceneState::default();
+        scenes.press(0, ButtonAction::Momentary, &defaults);
+        scenes.press(1, ButtonAction::Momentary, &["lamp-test"]);
+        assert_eq!(scenes.release(0), None);
+        assert_eq!(scenes.release(1).unwrap(), defaults);
     }
 }

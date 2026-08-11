@@ -29,6 +29,9 @@ pub const PATTERN_NAMES: &[&str] = &[
     "a9k-8t-l",
     "a9k-40ge-l",
     "a9k-rsp440-tr",
+    "rainbow",
+    "lamp-test",
+    "blackout",
     "static",
 ];
 
@@ -48,6 +51,9 @@ pub fn make_pattern(name: &str) -> Option<BoxedPattern> {
         "a9k-8t-l" => Box::new(A9K8TL::default()),
         "a9k-40ge-l" => Box::new(A9K40GE::default()),
         "a9k-rsp440-tr" => Box::new(RSP440::default()),
+        "rainbow" => Box::new(Rainbow::default()),
+        "lamp-test" => Box::new(LampTest::default()),
+        "blackout" => Box::new(Blackout),
         "static" => Box::new(Static),
         _ => return None,
     };
@@ -113,6 +119,14 @@ impl Controller {
         self.active.iter().any(|p| p.info().name == name)
     }
 
+    /// Names of the currently active patterns, preserving render order.
+    pub fn active_pattern_names(&self) -> Vec<&'static str> {
+        self.active
+            .iter()
+            .map(|pattern| pattern.info().name)
+            .collect()
+    }
+
     /// Enable a pattern by name (mirrors `EnablePattern`): no-op if already on;
     /// disables others in the same category unless that category is `"misc"`;
     /// bootstraps the fresh instance with a shaper-derived intensity.
@@ -150,6 +164,15 @@ impl Controller {
     pub fn clear(&mut self) {
         self.active.clear();
         self.blank();
+    }
+
+    /// Atomically replace the current pattern stack from the caller's point of
+    /// view. This is used for button scenes and momentary scene restoration.
+    pub fn replace_patterns(&mut self, names: &[&str]) {
+        self.clear();
+        for name in names {
+            self.enable(name);
+        }
     }
 
     fn blank(&mut self) {
@@ -255,5 +278,16 @@ mod tests {
             c.tick(i as f32 * 0.1);
         }
         assert_eq!(c.frame(), 30);
+    }
+
+    #[test]
+    fn replace_patterns_clears_and_rebuilds_the_scene() {
+        let mut c = ctrl();
+        c.enable("greenstatus");
+        c.enable("a9k-8t-l");
+        c.replace_patterns(&["rainbow"]);
+        assert_eq!(c.active_pattern_names(), ["rainbow"]);
+        c.replace_patterns(&["greenstatus", "a9k-8t-l"]);
+        assert_eq!(c.active_pattern_names(), ["greenstatus", "a9k-8t-l"]);
     }
 }

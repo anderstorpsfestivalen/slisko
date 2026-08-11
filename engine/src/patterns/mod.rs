@@ -12,7 +12,7 @@ mod r#static;
 mod status;
 
 pub use colorcycler::Colorcycler;
-pub use globals::{Snake, Strobe};
+pub use globals::{Blackout, LampTest, Rainbow, Snake, Strobe};
 pub use linecards::{A9K8TL, A9K40GE, Blink48Ports, X6704};
 pub use mapper::Mapper;
 pub use panels::{RSP440, SUP720};

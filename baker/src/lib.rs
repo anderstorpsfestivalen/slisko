@@ -1083,6 +1083,7 @@ mod tests {
         assert_eq!(
             outputs,
             vec![
+                (1, 0, 42),
                 (2, 42, 51),
                 (3, 51, 60),
                 (4, 60, 72),
@@ -1092,16 +1093,18 @@ mod tests {
                 (15, 102, 145),
             ]
         );
-        assert_eq!(baked.buttons.len(), 4);
-        assert_eq!(baked.buttons[0].name, "RSP1 ACO");
+        assert_eq!(baked.buttons.len(), 3);
+        assert_eq!(baked.buttons[0].name, "RSP0 ACO");
         assert_eq!(baked.buttons[0].gpio, 17);
-        assert!(matches!(baked.buttons[1].action, BakedButtonAction::Hold));
-        assert!(
-            baked
-                .buttons
-                .iter()
-                .all(|button| button.patterns.is_empty())
-        );
+        assert_eq!(baked.buttons[1].name, "RSP1 ACO");
+        assert_eq!(baked.buttons[1].gpio, 33);
+        assert_eq!(baked.buttons[1].patterns, ["rainbow"]);
+        assert!(matches!(
+            baked.buttons[2].action,
+            BakedButtonAction::Momentary
+        ));
+        assert_eq!(baked.buttons[2].gpio, 32);
+        assert_eq!(baked.buttons[2].patterns, ["lamp-test"]);
         let rendered = baked.render();
         syn::parse_file(&rendered).expect("rendered 9010 configuration must be valid Rust");
         assert!(rendered.contains("pub const LED_COUNT: usize = 145;"));

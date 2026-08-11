@@ -37,8 +37,12 @@ impl LedOutput {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ButtonAction {
+    /// Replace the active pattern set when the button is pressed.
     Change,
+    /// Temporarily replace the pattern set while the button is held, then
+    /// restore the scene that was active before the press.
     Momentary,
+    /// Latch the replacement scene until another button is pressed.
     Hold,
 }
 

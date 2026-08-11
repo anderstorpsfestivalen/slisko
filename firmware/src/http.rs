@@ -44,7 +44,17 @@ impl HttpManager {
         }
     }
 
-    pub fn poll(&mut self, now_ms: u64) {
+    pub fn poll(&mut self, now_ms: u64, network_ready: bool) {
+        // EspHttpServer ultimately creates lwIP sockets. On ESP-IDF that can
+        // assert rather than return an error when esp-netif construction has
+        // failed, so wait for a valid DHCP/IP state before first startup.
+        if !network_ready {
+            if self.server.is_none() {
+                self.health
+                    .update(|health| health.http = ServiceState::Stopped);
+            }
+            return;
+        }
         if self.server.is_some() || !self.retry.ready(now_ms) {
             return;
         }

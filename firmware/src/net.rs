@@ -6,8 +6,7 @@
 //! while the network is unavailable.
 
 use esp_idf_hal::gpio::{
-    AnyOutputPin, Gpio0, Gpio16, Gpio18, Gpio19, Gpio21, Gpio22, Gpio23, Gpio25, Gpio26, Gpio27,
-    Output, PinDriver,
+    Gpio0, Gpio16, Gpio18, Gpio19, Gpio21, Gpio22, Gpio23, Gpio25, Gpio26, Gpio27,
 };
 use esp_idf_hal::mac::MAC;
 use esp_idf_svc::eth::{EspEth, EthDriver, RmiiClockConfig, RmiiEth, RmiiEthChipset};
@@ -53,7 +52,6 @@ pub struct NetworkStatus {
 }
 
 pub struct NetworkManager {
-    _power: PinDriver<'static, Output>,
     eth: EspEth<'static, RmiiEth>,
     health: Health,
     start_retry: ExponentialBackoff,
@@ -70,9 +68,6 @@ impl NetworkManager {
         health: Health,
         now_ms: u64,
     ) -> Result<Self, EspError> {
-        let mut power = PinDriver::output(p.gpio16)?;
-        power.set_high()?;
-
         let driver = EthDriver::new_rmii(
             p.mac,
             p.gpio25,
@@ -84,14 +79,17 @@ impl NetworkManager {
             p.gpio19,
             p.gpio18,
             RmiiClockConfig::Input(p.gpio0),
-            None::<AnyOutputPin>,
+            // WT32-ETH01 GPIO16 is the LAN8720 power/reset line. Hand it to
+            // ESP-IDF so lan87xx_reset_hw performs the required low/high reset
+            // before reading the PHY identifier. Merely driving it high can
+            // race PHY startup and produce `wrong chip OUI`.
+            Some(p.gpio16),
             RmiiEthChipset::LAN87XX,
             Some(ethpins::PHY_ADDR),
             sysloop,
         )?;
         let eth = EspEth::wrap(driver)?;
         let mut manager = Self {
-            _power: power,
             eth,
             health,
             start_retry: ExponentialBackoff::new(RETRY_INITIAL_MS, RETRY_MAX_MS),

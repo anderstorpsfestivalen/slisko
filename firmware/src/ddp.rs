@@ -97,7 +97,7 @@ impl DdpService {
         }
     }
 
-    pub fn poll(&mut self, now_ms: u64) {
+    pub fn poll(&mut self, now_ms: u64, network_ready: bool) {
         if self.worker.as_ref().is_some_and(JoinHandle::is_finished) {
             let Some(worker) = self.worker.take() else {
                 return;
@@ -112,6 +112,19 @@ impl DdpService {
                 health.last_error = Some(detail);
             });
             self.retry.fail(now_ms);
+        }
+
+        // Binding a socket before ESP-IDF has constructed a usable esp-netif
+        // instance aborts inside lwIP (`Invalid mbox`) instead of returning an
+        // ordinary I/O error. Existing workers may remain alive across a link
+        // outage because the TCP/IP stack still exists, but never create the
+        // first worker until DHCP has brought that stack fully online.
+        if !network_ready {
+            if self.worker.is_none() {
+                self.health
+                    .update(|health| health.ddp = ServiceState::Stopped);
+            }
+            return;
         }
 
         if self.worker.is_none() && self.retry.ready(now_ms) {

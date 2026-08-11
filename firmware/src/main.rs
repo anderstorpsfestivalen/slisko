@@ -228,7 +228,7 @@ fn run() -> Result<(), EspError> {
         (35, pins.gpio35.degrade_input()),
         (36, pins.gpio36.degrade_input()),
     ];
-    let mut buttons = buttons::Buttons::new(header_pins, health.clone());
+    let mut buttons = buttons::Buttons::new(header_pins, ctrl.clone(), health.clone());
     let mut http = http::HttpManager::new(ctrl.clone(), ddp_state.clone(), health.clone());
 
     // --- Render + supervision loop ---
@@ -251,8 +251,8 @@ fn run() -> Result<(), EspError> {
             if let Some(hour) = timesync.poll(now_ms, network_status) {
                 lock_recover(&ctrl).set_hour(hour);
             }
-            ddp_service.poll(now_ms);
-            http.poll(now_ms);
+            ddp_service.poll(now_ms, network_status.ip_up);
+            http.poll(now_ms, network_status.ip_up);
             next_supervision_ms = now_ms.saturating_add(SUPERVISOR_PERIOD_MS);
 
             if hardware_restart_at.is_some_and(|deadline| now_ms >= deadline) {
@@ -378,6 +378,10 @@ fn take_led_pin(
     by_gpio: &mut [(u8, Option<AnyOutputPin<'static>>); 8],
     gpio: u8,
 ) -> Option<AnyOutputPin<'static>> {
+    if cfg!(feature = "uart-logs") && gpio == 1 {
+        info!("ledinfo: uart-logs enabled; reserving GPIO1 for UART0 TX");
+        return None;
+    }
     match by_gpio.iter_mut().find(|(candidate, _)| *candidate == gpio) {
         Some((_, slot @ Some(_))) => slot.take(),
         Some((_, None)) => {

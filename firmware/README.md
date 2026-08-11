@@ -33,6 +33,19 @@ Set `SLISKO_CONFIG` before building to select a non-default configuration.
 
 ## Flash & monitor
 
+The checked-in Cargo runner flashes and starts a 115200-baud monitor. A normal
+run drives the complete baked LED mapping, including GPIO1:
+
 ```sh
-cargo espflash flash --monitor
+source ~/export-esp.sh
+SLISKO_CONFIG=configurations/9010.toml cargo run
+```
+
+GPIO1 is also UART0 TX. For button/debug sessions, build and flash a temporary
+variant that reserves GPIO1 for readable serial logs; the first LED output will
+remain dark until a normal build is flashed again:
+
+```sh
+source ~/export-esp.sh
+SLISKO_CONFIG=configurations/9010.toml cargo run --features uart-logs
 ```

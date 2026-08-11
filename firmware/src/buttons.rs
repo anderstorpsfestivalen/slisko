@@ -1,14 +1,17 @@
 //! Active-low GPIO buttons, polled and debounced by the render task so GPIO
 //! ownership cannot be stranded in a failed worker thread.
 
+use std::sync::{Arc, Mutex};
+
 use esp_idf_hal::gpio::{AnyInputPin, Input, PinDriver, Pull};
-use log::{debug, info, warn};
+use log::{info, warn};
 
 use config as cfg;
 use config::ButtonAction;
+use engine::controller::Controller;
 
-use crate::health::{Health, ServiceState};
-use crate::recovery::{ActiveLowDebouncer, ButtonEdge};
+use crate::health::{Health, ServiceState, lock_recover};
+use crate::recovery::{ActiveLowDebouncer, ButtonEdge, ButtonSceneState};
 
 const POLL_INTERVAL_MS: u64 = 10;
 const DEBOUNCE_MS: u64 = 30;
@@ -24,11 +27,17 @@ struct Btn {
 pub struct Buttons {
     btns: Vec<Btn>,
     next_poll_ms: u64,
+    controller: Arc<Mutex<Controller>>,
+    scenes: ButtonSceneState,
     health: Health,
 }
 
 impl Buttons {
-    pub fn new(mut header_pins: Vec<(u8, AnyInputPin<'static>)>, health: Health) -> Self {
+    pub fn new(
+        mut header_pins: Vec<(u8, AnyInputPin<'static>)>,
+        controller: Arc<Mutex<Controller>>,
+        health: Health,
+    ) -> Self {
         let mut btns = Vec::new();
         for b in cfg::BUTTONS {
             let Some(pos) = header_pins.iter().position(|(g, _)| *g == b.gpio) else {
@@ -79,6 +88,8 @@ impl Buttons {
         Self {
             btns,
             next_poll_ms: 0,
+            controller,
+            scenes: ButtonSceneState::default(),
             health,
         }
     }
@@ -89,23 +100,49 @@ impl Buttons {
         }
         self.next_poll_ms = now_ms.saturating_add(POLL_INTERVAL_MS);
 
-        for button in &mut self.btns {
+        let mut events = Vec::new();
+        for (index, button) in self.btns.iter_mut().enumerate() {
             let low = button.pin.is_low();
-            match button.debouncer.update(low, now_ms) {
-                Some(ButtonEdge::Pressed) => {
-                    info!("BUTTON {} pressed", button.name);
-                    debug!(
-                        "button action {:?}, patterns {:?}",
-                        button.action, button.patterns
-                    );
-                }
-                Some(ButtonEdge::Released) => {
-                    debug!("BUTTON {} released", button.name);
-                }
-                None => {}
+            if let Some(edge) = button.debouncer.update(low, now_ms) {
+                events.push((index, edge));
+            }
+        }
+
+        for (index, edge) in events {
+            match edge {
+                ButtonEdge::Pressed => self.press(index),
+                ButtonEdge::Released => self.release(index),
             }
         }
         self.health
             .update(|state| state.buttons = ServiceState::Running);
+    }
+
+    fn press(&mut self, index: usize) {
+        let button = &self.btns[index];
+        let name = button.name;
+        let action = button.action;
+        let patterns = button.patterns;
+        info!("BUTTON {name} pressed: {action:?} -> {patterns:?}");
+
+        let current_patterns = if action == ButtonAction::Momentary {
+            lock_recover(&self.controller).active_pattern_names()
+        } else {
+            Vec::new()
+        };
+        self.scenes.press(index, action, &current_patterns);
+
+        lock_recover(&self.controller).replace_patterns(patterns);
+    }
+
+    fn release(&mut self, index: usize) {
+        let Some(restore_patterns) = self.scenes.release(index) else {
+            return;
+        };
+        info!(
+            "BUTTON {} released: restoring {:?}",
+            self.btns[index].name, restore_patterns
+        );
+        lock_recover(&self.controller).replace_patterns(&restore_patterns);
     }
 }
