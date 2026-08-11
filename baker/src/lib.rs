@@ -1001,7 +1001,7 @@ mod tests {
     #[test]
     fn bakes_9010_catalog_and_outputs() {
         let baked = bake_path(config_path("9010.toml")).unwrap();
-        assert_eq!(baked.led_count, 200);
+        assert_eq!(baked.led_count, 145);
         assert_eq!(baked.cards.len(), 10);
         assert_eq!(baked.cards[0].name, "A9K-40GE-L");
         assert_eq!(baked.cards[0].positions.len(), 41);
@@ -1013,25 +1013,38 @@ mod tests {
             baked.led_driver,
             BakedLedDriver::Ws281x(Ws281xType::Ws2815)
         ));
-        assert_eq!(baked.led_outputs.len(), 2);
-        assert!(matches!(
-            baked.led_outputs[1],
-            BakedLedOutput::Ws281x {
-                data: 7,
-                start: 100,
-                end: 200
-            }
-        ));
+        let outputs = baked
+            .led_outputs
+            .iter()
+            .map(|output| match output {
+                BakedLedOutput::Ws281x { data, start, end } => (*data, *start, *end),
+                BakedLedOutput::Apa102 { .. } => panic!("9010 output must be WS281x"),
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            outputs,
+            vec![
+                (1, 0, 42),
+                (2, 42, 51),
+                (3, 51, 60),
+                (4, 60, 72),
+                (5, 72, 84),
+                (12, 84, 93),
+                (14, 93, 102),
+                (15, 102, 145),
+            ]
+        );
         assert_eq!(baked.buttons[0].scene[3], "a9k-rsp440-tr");
         let rendered = baked.render();
         syn::parse_file(&rendered).expect("rendered 9010 configuration must be valid Rust");
-        assert!(rendered.contains("pub const LED_COUNT: usize = 200;"));
+        assert!(rendered.contains("pub const LED_COUNT: usize = 145;"));
+        assert_eq!(rendered.matches("MappingSegment::Gap(1)").count(), 5);
     }
 
     #[test]
     fn bakes_7609_catalog_and_mapping() {
         let baked = bake_path(config_path("7609.toml")).unwrap();
-        assert_eq!(baked.led_count, 132);
+        assert_eq!(baked.led_count, 131);
         assert_eq!(baked.cards.len(), 9);
         assert_eq!(baked.cards[0].positions.len(), 49);
         assert_eq!(baked.cards[4].positions.len(), 9);
@@ -1044,16 +1057,20 @@ mod tests {
                 global_pwm: true,
             })
         ));
-        assert_eq!(baked.led_outputs.len(), 1);
-        assert!(matches!(
-            baked.led_outputs[0],
-            BakedLedOutput::Apa102 {
-                clock: 14,
-                data: 5,
-                start: 0,
-                end: 132,
-            }
-        ));
+        let outputs = baked
+            .led_outputs
+            .iter()
+            .map(|output| match output {
+                BakedLedOutput::Apa102 {
+                    clock,
+                    data,
+                    start,
+                    end,
+                } => (*clock, *data, *start, *end),
+                BakedLedOutput::Ws281x { .. } => panic!("7609 output must be APA102"),
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(outputs, vec![(1, 2, 0, 50), (4, 3, 50, 131)]);
         assert_eq!(baked.mapping.len(), 11);
         let rendered = baked.render();
         syn::parse_file(&rendered).expect("rendered 7609 configuration must be valid Rust");

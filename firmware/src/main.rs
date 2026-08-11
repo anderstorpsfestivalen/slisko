@@ -1,18 +1,17 @@
 //! slisko firmware for the bong69 / WT32-ETH01 board (ESP32, esp-idf std).
 //!
-//! Boots from the shared baked `config` crate (chassis, active patterns, ledinfo
-//! output map, shaper), brings up Ethernet (LAN8720) + SNTP, and runs the render
-//! loop driving either WS281x RMT channels or APA102 SPI chains off the
-//! monotonic esp_timer clock. The Controller is shared (Arc<Mutex>) so the HTTP
-//! control surface and DDP sink can drive it.
+//! LED rendering is the primary service. Ethernet, DHCP, SNTP, DDP, HTTP, and
+//! buttons are supervised around it and may degrade without stopping patterns.
 
 mod apa102;
 mod board;
 mod buttons;
 mod ddp;
+mod health;
 mod http;
 mod net;
 mod output;
+mod recovery;
 mod time;
 
 use std::sync::{Arc, Mutex};
@@ -22,8 +21,12 @@ use esp_idf_hal::gpio::AnyOutputPin;
 use esp_idf_hal::peripherals::Peripherals;
 use esp_idf_svc::eventloop::EspSystemEventLoop;
 use esp_idf_svc::log::EspLogger;
-use esp_idf_svc::sys::{EspError, esp_random, esp_timer_get_time, link_patches};
-use log::{info, warn};
+use esp_idf_svc::sys::{
+    ESP_ERR_INVALID_STATE, ESP_OK, EspError, esp_random, esp_restart, esp_task_wdt_add,
+    esp_task_wdt_config_t, esp_task_wdt_init, esp_task_wdt_reconfigure, esp_task_wdt_reset,
+    esp_timer_get_time, link_patches,
+};
+use log::{error, info, warn};
 
 use engine::chassi::Chassi;
 use engine::controller::Controller;
@@ -33,9 +36,14 @@ use engine::traffic::{Shaper, ShaperConfig};
 use apa102::Apa102Output;
 use config as cfg;
 use config::{LedDriver, LedOutput};
+use health::{Health, lock_recover};
 use output::Ws281xOutput;
+use recovery::FailureWindow;
 
 const FPS: u32 = 60;
+const SUPERVISOR_PERIOD_MS: u64 = 1_000;
+const OUTPUT_RESTART_MS: u64 = 10_000;
+const HARDWARE_RESTART_MS: u64 = 60_000;
 
 type Shared = Arc<Mutex<Controller>>;
 
@@ -58,17 +66,28 @@ impl PhysicalOutputs<'_> {
     }
 }
 
-fn main() -> Result<(), EspError> {
+fn main() {
     link_patches();
     EspLogger::initialize_default();
     info!("firmware booting");
+
+    if let Err(error) = run() {
+        error!("fatal firmware initialization error: {error:?}; rebooting in 5 seconds");
+        FreeRtos::delay_ms(5_000);
+        unsafe { esp_restart() };
+    }
+}
+
+fn run() -> Result<(), EspError> {
+    let boot_ms = monotonic_ms();
+    let health = Health::new(boot_ms);
+    configure_watchdog(&health);
 
     let peripherals = Peripherals::take()?;
     let sysloop = EspSystemEventLoop::take()?;
     let pins = peripherals.pins;
 
-    // --- LED outputs: degrade the 8 board data pins, then map the baked ledinfo
-    // outputs onto them. (Partial move leaves the Ethernet pins available.) ---
+    // --- Physical outputs ---
     let mut led_slots: [(u8, Option<AnyOutputPin<'static>>); 8] = [
         (1, Some(pins.gpio1.degrade_output())),
         (2, Some(pins.gpio2.degrade_output())),
@@ -138,7 +157,35 @@ fn main() -> Result<(), EspError> {
         }
     };
 
-    // --- Ethernet (the board's only network path) ---
+    // --- Engine first: patterns never wait for network or wall clock. ---
+    let chassi = Chassi::from_specs(cfg::CHASSIS);
+    let strand_map = StrandMap::new(&chassi, cfg::OUTPUT_MAPPING, cfg::LED_COUNT)
+        .expect("baked output mapping must be valid");
+    let seed = ((unsafe { esp_random() } as u64) << 32) | unsafe { esp_random() } as u64;
+    let shaper = shaper_config();
+    let ctrl: Shared = Arc::new(Mutex::new(Controller::new(
+        chassi,
+        Shaper::new(shaper),
+        seed,
+    )));
+    {
+        let mut controller = lock_recover(&ctrl);
+        // Peak hour gives configured full intensity before the first NTP sync.
+        controller.set_hour((shaper.peak_start + shaper.peak_end) / 2.0);
+        for &name in cfg::ACTIVE_PATTERNS {
+            controller.enable(name);
+        }
+        info!(
+            "engine up: {} logical leds, {} output leds, {} active patterns; free heap = {} bytes",
+            controller.leds().len(),
+            cfg::LED_COUNT,
+            cfg::ACTIVE_PATTERNS.len(),
+            unsafe { esp_idf_svc::sys::esp_get_free_heap_size() }
+        );
+    }
+
+    // --- Ethernet. Construction failures require a reboot to reacquire pins,
+    // but patterns remain active for a minute before that recovery action. ---
     let eth_pins = net::EthPins {
         mac: peripherals.mac,
         gpio0: pins.gpio0,
@@ -152,52 +199,27 @@ fn main() -> Result<(), EspError> {
         gpio26: pins.gpio26,
         gpio27: pins.gpio27,
     };
-    let _eth_guard = match net::bring_up(eth_pins, sysloop) {
-        Ok(g) => Some(g),
-        Err(e) => {
-            warn!("ethernet bring-up failed: {e:?}");
-            None
-        }
-    };
+    let now_ms = monotonic_ms();
+    let (mut network, hardware_restart_at) =
+        match net::NetworkManager::new(eth_pins, sysloop, health.clone(), now_ms) {
+            Ok(manager) => (Some(manager), None),
+            Err(error) => {
+                warn!("ethernet construction failed: {error:?}; patterns remain active");
+                health.update(|state| {
+                    state.ethernet_driver = "failed";
+                    state.ethernet_link = "down";
+                    state.dhcp = "unavailable";
+                    state.last_error = Some(format!("Ethernet construction failed: {error:?}"));
+                });
+                (None, Some(now_ms.saturating_add(HARDWARE_RESTART_MS)))
+            }
+        };
 
-    // --- SNTP (feeds the shaper's hour-of-day) ---
-    let timesync = match time::TimeSync::start() {
-        Ok(t) => Some(t),
-        Err(e) => {
-            warn!("sntp start failed: {e:?}");
-            None
-        }
-    };
+    let mut timesync = time::TimeSync::new(health.clone());
 
-    // --- Engine (shared) from the baked chassis + shaper ---
-    let chassi = Chassi::from_specs(cfg::CHASSIS);
-    let strand_map = StrandMap::new(&chassi, cfg::OUTPUT_MAPPING, cfg::LED_COUNT)
-        .expect("baked output mapping must be valid");
-    let seed = ((unsafe { esp_random() } as u64) << 32) | unsafe { esp_random() } as u64;
-    let ctrl: Shared = Arc::new(Mutex::new(Controller::new(
-        chassi,
-        Shaper::new(shaper_config()),
-        seed,
-    )));
-    {
-        let mut c = ctrl.lock().unwrap();
-        for &name in cfg::ACTIVE_PATTERNS {
-            c.enable(name);
-        }
-        info!(
-            "engine up: {} logical leds, {} output leds, {} active patterns; free heap = {} bytes",
-            c.leds().len(),
-            cfg::LED_COUNT,
-            cfg::ACTIVE_PATTERNS.len(),
-            unsafe { esp_idf_svc::sys::esp_get_free_heap_size() }
-        );
-    }
-
-    // --- DDP sink (external override of internal patterns) ---
+    // --- Optional runtime services ---
     let ddp_state = ddp::DdpState::new(cfg::LED_COUNT);
-    ddp::spawn(ddp_state.clone());
-
-    // --- Buttons (expansion-header pins) -> scene switching ---
+    let mut ddp_service = ddp::DdpService::new(ddp_state.clone(), health.clone());
     let header_pins: Vec<(u8, esp_idf_hal::gpio::AnyInputPin<'static>)> = vec![
         (17, pins.gpio17.degrade_input()),
         (32, pins.gpio32.degrade_input()),
@@ -206,51 +228,120 @@ fn main() -> Result<(), EspError> {
         (35, pins.gpio35.degrade_input()),
         (36, pins.gpio36.degrade_input()),
     ];
-    buttons::spawn(header_pins, ctrl.clone());
+    let mut buttons = buttons::Buttons::new(header_pins, health.clone());
+    let mut http = http::HttpManager::new(ctrl.clone(), ddp_state.clone(), health.clone());
 
-    // --- HTTP control server + mDNS (kept alive for the program) ---
-    let _http_guard = match http::start(ctrl.clone(), ddp_state.clone()) {
-        Ok(g) => Some(g),
-        Err(e) => {
-            warn!("http start failed: {e:?}");
-            None
-        }
-    };
-
-    // --- Render loop ---
+    // --- Render + supervision loop ---
     let start_us = unsafe { esp_timer_get_time() };
     let frame_ms = (1000 / FPS).max(1);
-    let mut sntp_logged = false;
     let mut mapped_leds = Vec::with_capacity(cfg::LED_COUNT);
+    let mut next_supervision_ms = 0;
+    let mut output_failures = FailureWindow::default();
+    let mut last_output_log_ms = 0;
+
     loop {
-        let elapsed_us = (unsafe { esp_timer_get_time() } - start_us) as u64;
+        let now_ms = monotonic_ms();
+        let now_us = unsafe { esp_timer_get_time() };
+        let elapsed_us = now_us.saturating_sub(start_us) as u64;
 
-        // Once a second, refresh the shaper hour from SNTP (if synced).
-        if let Some(ts) = &timesync
-            && ts.synced()
-        {
-            if !sntp_logged {
-                info!("sntp synced; hour-of-day = {:.2}", time::hour_of_day());
-                sntp_logged = true;
+        if now_ms >= next_supervision_ms {
+            let network_status = network
+                .as_mut()
+                .map_or_else(net::NetworkStatus::default, |network| network.poll(now_ms));
+            if let Some(hour) = timesync.poll(now_ms, network_status) {
+                lock_recover(&ctrl).set_hour(hour);
             }
-            if let Ok(mut c) = ctrl.lock() {
-                c.set_hour(time::hour_of_day());
+            ddp_service.poll(now_ms);
+            http.poll(now_ms);
+            next_supervision_ms = now_ms.saturating_add(SUPERVISOR_PERIOD_MS);
+
+            if hardware_restart_at.is_some_and(|deadline| now_ms >= deadline) {
+                controlled_restart("Ethernet hardware could not be constructed");
             }
         }
 
+        buttons.poll(now_ms, &ctrl);
         {
-            let mut c = ctrl.lock().unwrap();
+            let mut controller = lock_recover(&ctrl);
             if ddp_state.active() {
-                // External source overrides internal patterns.
-                ddp_state.apply(&strand_map, c.leds_mut());
+                ddp_state.apply(&strand_map, controller.leds_mut());
             } else {
-                c.tick_micros(elapsed_us);
+                controller.tick_micros(elapsed_us);
             }
-            strand_map.copy_pixels(c.leds(), &mut mapped_leds);
-            leds.write(&mapped_leds)?;
+            strand_map.copy_pixels(controller.leds(), &mut mapped_leds);
         }
+
+        match leds.write(&mapped_leds) {
+            Ok(()) => {
+                if output_failures.consecutive() > 0 {
+                    info!(
+                        "LED output recovered after {} failed frames",
+                        output_failures.consecutive()
+                    );
+                }
+                output_failures.record_success();
+                health.update(|state| state.consecutive_output_errors = 0);
+            }
+            Err(output_error) => {
+                output_failures.record_failure(now_ms);
+                let consecutive = output_failures.consecutive();
+                health.update(|state| {
+                    state.consecutive_output_errors = consecutive;
+                    state.total_output_errors = state.total_output_errors.wrapping_add(1);
+                    state.last_error = Some(format!("LED output failed: {output_error:?}"));
+                });
+                if consecutive == 1 || now_ms.saturating_sub(last_output_log_ms) >= 60_000 {
+                    warn!("LED output failed ({output_error:?}); continuing render loop");
+                    last_output_log_ms = now_ms;
+                }
+                if output_failures.expired(now_ms, OUTPUT_RESTART_MS) {
+                    controlled_restart("LED output failed continuously for 10 seconds");
+                }
+            }
+        }
+
+        health.update(|state| state.frames = state.frames.wrapping_add(1));
+        feed_watchdog();
         FreeRtos::delay_ms(frame_ms);
     }
+}
+
+fn configure_watchdog(health: &Health) {
+    let config = esp_task_wdt_config_t {
+        timeout_ms: 10_000,
+        idle_core_mask: 0b11,
+        trigger_panic: true,
+    };
+    let mut result = unsafe { esp_task_wdt_reconfigure(&config) };
+    if result == ESP_ERR_INVALID_STATE {
+        result = unsafe { esp_task_wdt_init(&config) };
+    }
+    if result != ESP_OK {
+        warn!("watchdog configuration failed: {result}");
+        health.record_error(format!("watchdog configuration failed: {result}"));
+        return;
+    }
+    let result = unsafe { esp_task_wdt_add(core::ptr::null_mut()) };
+    if result != ESP_OK {
+        warn!("watchdog task registration failed: {result}");
+        health.record_error(format!("watchdog registration failed: {result}"));
+    } else {
+        info!("watchdog: render task armed for 10 seconds");
+    }
+}
+
+fn feed_watchdog() {
+    let _ = unsafe { esp_task_wdt_reset() };
+}
+
+fn controlled_restart(reason: &str) -> ! {
+    error!("{reason}; restarting");
+    FreeRtos::delay_ms(100);
+    unsafe { esp_restart() }
+}
+
+fn monotonic_ms() -> u64 {
+    unsafe { esp_timer_get_time().max(0) as u64 / 1_000 }
 }
 
 /// Convert the baked `ShaperConfig` literal into the core type.
@@ -267,13 +358,12 @@ fn shaper_config() -> ShaperConfig {
     }
 }
 
-/// Pair each baked WS281x data pin with its board pin and pixel range.
 fn map_ws281x_outputs(
     by_gpio: &mut [(u8, Option<AnyOutputPin<'static>>); 8],
 ) -> Vec<(AnyOutputPin<'static>, core::ops::Range<usize>)> {
     let mut outputs = Vec::new();
-    for o in cfg::LED_OUTPUTS {
-        let LedOutput::Ws281x { data, start, end } = *o else {
+    for output in cfg::LED_OUTPUTS {
+        let LedOutput::Ws281x { data, start, end } = *output else {
             warn!("ledinfo: ignoring APA102 mapping for WS281x driver");
             continue;
         };
@@ -284,8 +374,6 @@ fn map_ws281x_outputs(
     outputs
 }
 
-/// Resolve one GPIO against the LED-capable pins on this bong69 revision while
-/// preserving the existing unavailable/reused warnings.
 fn take_led_pin(
     by_gpio: &mut [(u8, Option<AnyOutputPin<'static>>); 8],
     gpio: u8,

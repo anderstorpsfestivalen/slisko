@@ -118,8 +118,18 @@ impl<'d> Ws281xOutput<'d> {
             if self.scratch.is_empty() {
                 continue;
             }
-            let encoder = BytesEncoder::with_config(&strip.enc_cfg)?;
-            strip.tx.send_and_wait(encoder, &self.scratch, &tx_cfg)?;
+            let mut encoder = BytesEncoder::with_config(&strip.enc_cfg)?;
+
+            // Use the raw ESP-IDF encoder directly. esp-idf-hal 0.46.2's
+            // `send_and_wait` adapter treats `rmt_encode_state_t` as an enum,
+            // but ESP-IDF defines it as bitflags and legitimately returns
+            // COMPLETE | MEM_FULL for longer WS281x frames. Converting that
+            // value panics from the RMT ISR. Waiting here keeps both the
+            // encoder and scratch buffer alive until the transaction finishes.
+            unsafe {
+                strip.tx.start_send(&mut encoder, &self.scratch, &tx_cfg)?;
+            }
+            strip.tx.wait_all_done(None)?;
         }
         Ok(())
     }

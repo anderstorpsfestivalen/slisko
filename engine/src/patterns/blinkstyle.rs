@@ -12,6 +12,9 @@ use crate::pattern::BootstrapCtx;
 use crate::pixel::Pixel;
 use crate::utils;
 
+/// Cisco 7609 link LEDs use solid red to mean a down/dead port.
+pub const CISCO7609_DEAD_PORT_CHANCE: f32 = 0.03;
+
 /// RGB multipliers (0.0..1.0), mirrors `ColorStyle`.
 #[derive(Clone, Copy, Debug)]
 pub struct ColorStyle {
@@ -138,7 +141,9 @@ pub fn asr9000_style() -> BlinkStyle {
     }
 }
 
-/// Blink style for Cisco 7609 linecards (mirrors `Cisco7609Style`).
+/// Blink style for Cisco 7609 linecards. Unlike the last Go default, the
+/// physical installation reserves solid red for an approximately 3% set of
+/// down/dead ports.
 pub fn cisco7609_style() -> BlinkStyle {
     BlinkStyle {
         min_interval: 0.1,
@@ -164,7 +169,39 @@ pub fn cisco7609_style() -> BlinkStyle {
             g: 0.0,
             b: 0.0,
         },
-        dead_port_chance: 0.0,
+        dead_port_chance: CISCO7609_DEAD_PORT_CHANCE,
         slow_speed_chance: 0.2,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::faker::Rng;
+
+    #[test]
+    fn cisco_dead_ports_are_three_percent_and_solid_red() {
+        let style = cisco7609_style();
+        assert_eq!(style.dead_port_chance, 0.03);
+
+        let mut always_dead = style;
+        always_dead.dead_port_chance = 1.0;
+        let mut rng = Rng::new(7);
+        let mut ctx = BootstrapCtx {
+            rng: &mut rng,
+            intensity: 1.0,
+        };
+        let mut port = always_dead.create_port(0, &mut ctx);
+        let mut leds = [Pixel::new()];
+
+        port.render(&mut leds, 0);
+        assert_eq!(leds[0].to_srgb8(), [255, 0, 0]);
+        port.render(&mut leds, 60_000);
+        assert_eq!(leds[0].to_srgb8(), [255, 0, 0]);
+    }
+
+    #[test]
+    fn asr_dead_port_probability_is_unchanged() {
+        assert_eq!(asr9000_style().dead_port_chance, 0.067);
     }
 }

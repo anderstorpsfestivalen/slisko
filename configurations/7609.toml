@@ -1,6 +1,8 @@
 # Cisco 7609
 
-LEDAmount = 132
+# Two physical APA102 chains as recorded in assets/cisco7960-mappings.md:
+# 50 pixels on port 1 followed by 81 pixels on port 2.
+LEDAmount = 131
 Linecards = [
     "6478",
     "6704",
@@ -44,5 +46,6 @@ port = 4048
 [ledinfo]
 type = "APA102"
 mapping = [
-    {clock = 14, data = 5, range = "0-132"},
+    { clock = 1, data = 2, range = "0-50" },
+    { clock = 4, data = 3, range = "50-131" },
 ]

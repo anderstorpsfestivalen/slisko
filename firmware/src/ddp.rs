@@ -11,6 +11,8 @@ use std::net::UdpSocket;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::thread::JoinHandle;
+use std::time::Duration;
 
 use ddp_rs::packet::PacketRef;
 use esp_idf_svc::sys::esp_timer_get_time;
@@ -18,6 +20,9 @@ use log::{info, warn};
 
 use engine::output::StrandMap;
 use engine::pixel::Pixel;
+
+use crate::health::{Health, ServiceState, lock_recover};
+use crate::recovery::ExponentialBackoff;
 
 pub const DDP_PORT: u16 = 4048;
 /// If no DDP frame arrives within this window, fall back to internal patterns.
@@ -56,47 +61,108 @@ impl DdpState {
             return false;
         }
         let now = unsafe { esp_timer_get_time() };
-        now - *self.last_us.lock().unwrap() < STALE_US
+        now.saturating_sub(*lock_recover(&self.last_us)) < STALE_US
     }
 
     /// Paint the latest DDP RGB buffer into the strand.
     pub fn apply(&self, map: &StrandMap, leds: &mut [Pixel]) {
-        let buf = self.rgb.lock().unwrap();
+        let buf = lock_recover(&self.rgb);
         let _ = map.apply_srgb8(&buf, leds);
     }
 
     fn ingest(&self, offset: usize, data: &[u8]) {
-        let mut buf = self.rgb.lock().unwrap();
-        let end = (offset + data.len()).min(buf.len());
+        let mut buf = lock_recover(&self.rgb);
+        let end = offset.saturating_add(data.len()).min(buf.len());
         if offset < end {
             buf[offset..end].copy_from_slice(&data[..end - offset]);
         }
-        *self.last_us.lock().unwrap() = unsafe { esp_timer_get_time() };
+        *lock_recover(&self.last_us) = unsafe { esp_timer_get_time() };
     }
 }
 
-/// Spawn the UDP receive loop. Errors (e.g. before the netif is up) are logged;
-/// the thread keeps trying to (re)bind.
-pub fn spawn(state: Arc<DdpState>) {
-    std::thread::Builder::new()
-        .name("ddp".into())
-        .stack_size(4096)
-        .spawn(move || run(state))
-        .expect("spawn ddp thread");
+pub struct DdpService {
+    state: Arc<DdpState>,
+    health: Health,
+    worker: Option<JoinHandle<()>>,
+    retry: ExponentialBackoff,
 }
 
-fn run(state: Arc<DdpState>) {
+impl DdpService {
+    pub fn new(state: Arc<DdpState>, health: Health) -> Self {
+        Self {
+            state,
+            health,
+            worker: None,
+            retry: ExponentialBackoff::new(1_000, 60_000),
+        }
+    }
+
+    pub fn poll(&mut self, now_ms: u64) {
+        if self.worker.as_ref().is_some_and(JoinHandle::is_finished) {
+            let Some(worker) = self.worker.take() else {
+                return;
+            };
+            let detail = match worker.join() {
+                Ok(()) => "DDP worker exited".to_string(),
+                Err(_) => "DDP worker panicked".to_string(),
+            };
+            warn!("{detail}; scheduling restart");
+            self.health.update(|health| {
+                health.ddp = ServiceState::Stopped;
+                health.last_error = Some(detail);
+            });
+            self.retry.fail(now_ms);
+        }
+
+        if self.worker.is_none() && self.retry.ready(now_ms) {
+            let state = self.state.clone();
+            let health = self.health.clone();
+            match std::thread::Builder::new()
+                .name("ddp".into())
+                // The receive buffer alone is 1500 bytes; leave enough room
+                // for Rust/ESP-IDF socket and logging frames during failures.
+                .stack_size(8192)
+                .spawn(move || run(state, health))
+            {
+                Ok(worker) => {
+                    self.worker = Some(worker);
+                    self.retry.reset();
+                    self.health
+                        .update(|health| health.ddp = ServiceState::Running);
+                }
+                Err(error) => {
+                    let delay = self.retry.fail(now_ms);
+                    warn!("ddp: worker spawn failed ({error}); retrying in {delay} ms");
+                    self.health.update(|health| {
+                        health.ddp = ServiceState::Retrying;
+                        health.last_error = Some(format!("DDP spawn failed: {error}"));
+                    });
+                }
+            }
+        }
+    }
+}
+
+fn run(state: Arc<DdpState>, health: Health) {
     let mut packet = [0u8; 1500];
     loop {
         let sock = match UdpSocket::bind(("0.0.0.0", DDP_PORT)) {
             Ok(s) => s,
             Err(e) => {
                 warn!("ddp: bind :{DDP_PORT} failed ({e}); retrying");
-                std::thread::sleep(std::time::Duration::from_secs(2));
+                health.update(|state| {
+                    state.ddp = ServiceState::Retrying;
+                    state.last_error = Some(format!("DDP bind failed: {e}"));
+                });
+                std::thread::sleep(Duration::from_secs(2));
                 continue;
             }
         };
+        if let Err(error) = sock.set_read_timeout(Some(Duration::from_secs(1))) {
+            warn!("ddp: failed to set receive timeout ({error})");
+        }
         info!("ddp: listening on udp/{DDP_PORT}");
+        health.update(|state| state.ddp = ServiceState::Running);
         loop {
             match sock.recv(&mut packet) {
                 Ok(n) => {
@@ -107,8 +173,20 @@ fn run(state: Arc<DdpState>) {
                         state.ingest(p.header.offset as usize, &p.data[..avail]);
                     }
                 }
+                Err(e)
+                    if matches!(
+                        e.kind(),
+                        std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                    ) =>
+                {
+                    health.update(|state| state.ddp = ServiceState::Running);
+                }
                 Err(e) => {
                     warn!("ddp: recv error ({e}); rebinding");
+                    health.update(|state| {
+                        state.ddp = ServiceState::Retrying;
+                        state.last_error = Some(format!("DDP receive failed: {e}"));
+                    });
                     break;
                 }
             }

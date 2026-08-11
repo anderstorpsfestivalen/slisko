@@ -1,5 +1,9 @@
 # Roomier main task stack (we run networking + render setup on it).
 CONFIG_ESP_MAIN_TASK_STACK_SIZE=24000
+CONFIG_PTHREAD_TASK_STACK_SIZE_DEFAULT=8192
+
+CONFIG_MBEDTLS_CERTIFICATE_BUNDLE=y
+CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_FULL=y
 
 # Ethernet via the internal ESP32 EMAC + an external RMII PHY (LAN8720).
 CONFIG_ETH_ENABLED=y
@@ -8,3 +12,11 @@ CONFIG_ETH_PHY_INTERFACE_RMII=y
 
 # Use the GPIO0 input as the 50 MHz RMII reference clock (WT32-ETH01 wiring).
 CONFIG_ETH_RMII_CLK_INPUT=y
+
+# Runtime resilience: rotate among three SNTP servers and reset if the render
+# task stops feeding its watchdog.
+CONFIG_LWIP_SNTP_MAX_SERVERS=3
+CONFIG_ESP_TASK_WDT_EN=y
+CONFIG_ESP_TASK_WDT_INIT=y
+CONFIG_ESP_TASK_WDT_PANIC=y
+CONFIG_ESP_TASK_WDT_TIMEOUT_S=10

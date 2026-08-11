@@ -4,7 +4,7 @@ target = "xtensa-esp32-espidf"
 
 [target.xtensa-esp32-espidf]
 linker = "ldproxy"
-runner = "espflash flash --monitor"
+runner = "espflash flash --monitor --baud 115200"
 # espidf_time64: esp-idf v5.x uses 64-bit time_t.
 rustflags = ["--cfg", "espidf_time64"]
 

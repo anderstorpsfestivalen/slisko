@@ -8,7 +8,9 @@ use alloc::vec::Vec;
 use crate::chassi::Chassi;
 use crate::faker::{Fake, RandomBlinker, RandomInterval, Rng};
 use crate::pattern::{BootstrapCtx, Pattern, PatternInfo, RenderInfo};
-use crate::patterns::blinkstyle::{BlinkStyle, PortState, asr9000_style, cisco7609_style};
+use crate::patterns::blinkstyle::{
+    BlinkStyle, CISCO7609_DEAD_PORT_CHANCE, PortState, asr9000_style, cisco7609_style,
+};
 use crate::utils;
 
 /// One port driven by a plain `RandomInterval(RandomBlinker)` faker.
@@ -94,10 +96,11 @@ impl Pattern for A9K40GE {
 
 // ---- plain per-port fakers: X6704, A9K8TL ----
 
-/// `x6704`: Cisco "6704" ports, simple green flicker.
+/// `x6704`: Cisco "6704" ports, simple green flicker with solid-red dead ports.
 #[derive(Default)]
 pub struct X6704 {
     ports: Vec<PortFaker>,
+    dead: Vec<usize>,
 }
 
 impl Pattern for X6704 {
@@ -105,6 +108,9 @@ impl Pattern for X6704 {
         for p in &mut self.ports {
             let v = utils::invert(p.faker.trig(info.millis));
             c.leds[p.port].set_clamped(v * 0.3, v * 1.0, 0.0);
+        }
+        for &idx in &self.dead {
+            c.leds[idx].set_clamped(1.0, 0.0, 0.0);
         }
     }
     fn info(&self) -> PatternInfo {
@@ -115,10 +121,14 @@ impl Pattern for X6704 {
     }
     fn bootstrap(&mut self, c: &Chassi, ctx: &mut BootstrapCtx) {
         for idx in c.link_indices_of_type("6704") {
-            self.ports.push(PortFaker {
-                faker: standard_faker(0.1, 7.0, 0.1, 12.0, ctx),
-                port: idx,
-            });
+            if ctx.rng.range_f32(0.0, 1.0) < CISCO7609_DEAD_PORT_CHANCE {
+                self.dead.push(idx);
+            } else {
+                self.ports.push(PortFaker {
+                    faker: standard_faker(0.1, 7.0, 0.1, 12.0, ctx),
+                    port: idx,
+                });
+            }
         }
     }
 }
@@ -161,5 +171,46 @@ impl Pattern for A9K8TL {
                 });
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::chassi::LineCardSpec;
+    use crate::pixel::Position;
+
+    static POSITION: &[Position] = &[Position {
+        x: 0.0,
+        y: 0.0,
+        size: 1.0,
+    }];
+    static SPEC: &[LineCardSpec] = &[LineCardSpec {
+        name: "6704",
+        image: "",
+        active: true,
+        positions: POSITION,
+        link: &[0],
+        status: None,
+        labeled: &[],
+    }];
+
+    #[test]
+    fn x6704_dead_port_stays_solid_red() {
+        let mut chassis = Chassi::from_specs(SPEC);
+        let mut pattern = X6704::default();
+        pattern.dead.push(0);
+
+        pattern.render(&RenderInfo::default(), &mut chassis);
+        assert_eq!(chassis.leds[0].to_srgb8(), [255, 0, 0]);
+
+        pattern.render(
+            &RenderInfo {
+                millis: 60_000,
+                ..RenderInfo::default()
+            },
+            &mut chassis,
+        );
+        assert_eq!(chassis.leds[0].to_srgb8(), [255, 0, 0]);
     }
 }
