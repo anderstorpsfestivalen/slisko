@@ -21,9 +21,9 @@ Mapping = [
     { card = 0 },
     { card = 1 },
     { card = 3 },
-    { gen = 1 }, # Port 4: skip first LED
+    { gen = 1 }, # Port 4 / RSP0: skip first LED
     { card = 4 },
-    { gen = 1 }, # Port 5: skip first LED
+    { gen = 1 }, # Port 5 / RSP1: skip first LED
     { card = 5 },
     { card = 6 },
     { card = 7 },
@@ -73,8 +73,8 @@ mapping = [
 # GPIO 1:  a9k40             0-42
 # GPIO 2:  8t                42-51
 # GPIO 3:  8t                51-60
-# GPIO 4:  skip + rsp        60-72
-# GPIO 5:  skip + rsp        72-84
+# GPIO 4:  skip + RSP0       60-72
+# GPIO 5:  skip + RSP1       72-84
 # GPIO 12: 8t                84-93
 # GPIO 14: 8t                93-102
 # GPIO 15: skip + a9k40 + 1 102-145

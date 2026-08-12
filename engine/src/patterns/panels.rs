@@ -40,7 +40,7 @@ fn set_all(c: &mut Chassi, idxs: &[usize], r: f32, g: f32, b: f32) {
 pub struct RSP440 {
     disk0: Option<Box<dyn Fake + Send>>,
     disk1: Option<Box<dyn Fake + Send>>,
-    // (gps, sync, maj, min, sso) index lists per card type.
+    // (gps, sync, maj, min, ssd) index lists per card type.
     se: PanelLabels,
     se2: PanelLabels,
 }
@@ -51,7 +51,7 @@ struct PanelLabels {
     sync: Vec<usize>,
     maj: Vec<usize>,
     min: Vec<usize>,
-    sso: Vec<usize>,
+    ssd: Vec<usize>,
 }
 
 impl PanelLabels {
@@ -61,7 +61,7 @@ impl PanelLabels {
             sync: c.leds_with_label_on_type(ty, "sync"),
             maj: c.leds_with_label_on_type(ty, "maj"),
             min: c.leds_with_label_on_type(ty, "min"),
-            sso: c.leds_with_label_on_type(ty, "sso"),
+            ssd: c.leds_with_label_on_type(ty, "ssd"),
         }
     }
 }
@@ -85,9 +85,9 @@ impl Pattern for RSP440 {
             set_all(c, &labels.maj, 0.0, 1.0, 0.0);
             set_all(c, &labels.min, 1.0, 0.5, 0.0);
         }
-        let (se_sso, se2_sso) = (self.se.sso.clone(), self.se2.sso.clone());
-        set_all(c, &se_sso, 0.0, 0.0, d0);
-        set_all(c, &se2_sso, 0.0, 0.0, d1);
+        let (se_ssd, se2_ssd) = (self.se.ssd.clone(), self.se2.ssd.clone());
+        set_all(c, &se_ssd, 0.0, 0.0, d0);
+        set_all(c, &se2_ssd, 0.0, 0.0, d1);
     }
     fn info(&self) -> PatternInfo {
         PatternInfo {

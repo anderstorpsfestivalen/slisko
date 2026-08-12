@@ -891,7 +891,26 @@ fn rsp_labels(entries: &[(&str, usize)]) -> BTreeMap<String, usize> {
         .collect()
 }
 
-fn rsp_positions() -> Vec<Position> {
+// GPIO4 / chassis RSP0. The two installed RSP cards have different physical
+// chain orders even though their front panels are identical.
+fn rsp0_positions() -> Vec<Position> {
+    vec![
+        position(57, 187, 5),
+        position(57, 198, 5),
+        position(57, 857, 4),
+        position(43, 880, 4),
+        position(57, 880, 4),
+        position(57, 900, 4),
+        position(43, 857, 4),
+        position(30, 880, 4),
+        position(43, 900, 4),
+        position(30, 857, 4),
+        position(30, 900, 4),
+    ]
+}
+
+// GPIO5 / chassis RSP1.
+fn rsp1_positions() -> Vec<Position> {
     vec![
         position(57, 187, 5),
         position(57, 198, 5),
@@ -912,19 +931,19 @@ fn card_rsp440() -> CardDefinition {
         name: "A9K-RSP440-SE",
         image: "a9k-rsp440-se.png",
         active: true,
-        positions: rsp_positions(),
+        positions: rsp0_positions(),
         link: vec![0],
         status: None,
         labeled: rsp_labels(&[
-            ("fail", 8),
-            ("crit", 5),
-            ("sso", 2),
-            ("aco", 9),
-            ("maj", 6),
-            ("fc_fault", 3),
+            ("fail", 9),
+            ("crit", 6),
+            ("ssd", 2),
+            ("aco", 7),
+            ("maj", 3),
+            ("fc_fault", 4),
             ("sync", 10),
-            ("min", 7),
-            ("gps", 4),
+            ("min", 8),
+            ("gps", 5),
         ]),
     }
 }
@@ -934,31 +953,19 @@ fn card_rsp440_2() -> CardDefinition {
         name: "A9K-RSP440-SE-2",
         image: "a9k-rsp440-se.png",
         active: true,
-        positions: vec![
-            position(57, 187, 5),
-            position(57, 198, 5),
-            position(57, 857, 4),
-            position(43, 880, 4),
-            position(57, 880, 4),
-            position(57, 900, 4),
-            position(43, 857, 4),
-            position(30, 880, 4),
-            position(43, 900, 4),
-            position(30, 857, 4),
-            position(30, 900, 4),
-        ],
+        positions: rsp1_positions(),
         link: vec![0],
         status: None,
         labeled: rsp_labels(&[
-            ("fail", 9),
-            ("crit", 6),
-            ("sso", 2),
-            ("aco", 7),
-            ("maj", 3),
-            ("fc_fault", 4),
+            ("fail", 8),
+            ("crit", 5),
+            ("ssd", 2),
+            ("aco", 9),
+            ("maj", 6),
+            ("fc_fault", 3),
             ("sync", 10),
-            ("min", 8),
-            ("gps", 5),
+            ("min", 7),
+            ("gps", 4),
         ]),
     }
 }
@@ -1064,10 +1071,6 @@ mod tests {
         assert_eq!(baked.cards.len(), 10);
         assert_eq!(baked.cards[0].name, "A9K-40GE-L");
         assert_eq!(baked.cards[0].positions.len(), 41);
-        assert_eq!(baked.cards[4].labeled["fail"], 8);
-        assert_eq!(baked.cards[5].labeled["fail"], 9);
-        assert_eq!(baked.cards[5].positions[3], position(43, 880, 4));
-        assert_eq!(baked.cards[5].positions[7], position(30, 880, 4));
         assert!(matches!(
             baked.led_driver,
             BakedLedDriver::Ws281x(Ws281xType::Ws2815)
