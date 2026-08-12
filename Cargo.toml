@@ -24,3 +24,8 @@ exclude = ["firmware"]
 [workspace.package]
 edition = "2024"
 license = "MIT"
+
+# ggez 0.10 spins forever when wgpu temporarily cannot supply a surface
+# texture. Keep a local patch until upstream's begin_frame can skip such frames.
+[patch.crates-io]
+ggez = { path = "vendor/ggez" }

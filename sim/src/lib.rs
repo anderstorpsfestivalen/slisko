@@ -21,7 +21,7 @@ use engine::output::StrandMap;
 use ggez::conf::{WindowMode, WindowSetup};
 use ggez::event;
 use ggez::glam::Vec2;
-use ggez::graphics::{Canvas, Color, DrawMode, DrawParam, Image, Mesh, Rect};
+use ggez::graphics::{Canvas, Color, DrawMode, DrawParam, FrameAcquireStatus, Image, Mesh, Rect};
 use ggez::winit::application::ApplicationHandler;
 use ggez::winit::event::{DeviceEvent, DeviceId, ElementState, WindowEvent};
 use ggez::winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoopProxy};
@@ -421,16 +421,20 @@ impl SimulatorApp {
         }
     }
 
-    fn render(&mut self) -> GameResult {
+    fn render(&mut self) -> GameResult<FrameAcquireStatus> {
+        let frame_status = self.ctx.gfx.begin_frame()?;
+        if frame_status != FrameAcquireStatus::Acquired {
+            return Ok(frame_status);
+        }
+
         self.ctx.time.tick();
         self.simulator.apply_frame(self.mailbox.take())?;
-        self.ctx.gfx.begin_frame()?;
         self.simulator.draw(&mut self.ctx)?;
         self.ctx.gfx.end_frame()?;
         self.ctx.mouse.reset_delta();
         self.ctx.keyboard.save_keyboard_state();
         self.ctx.mouse.save_mouse_state();
-        Ok(())
+        Ok(FrameAcquireStatus::Acquired)
     }
 
     fn render_if_needed(&mut self, event_loop: &ActiveEventLoop) {
@@ -445,13 +449,26 @@ impl SimulatorApp {
             return;
         }
 
-        // ggez renders from AboutToWait as well. In particular, do not acquire
-        // a Metal drawable from macOS's NSView::drawRect callback: wgpu can
-        // stall inside get_current_texture() there and consume a full core.
-        if let Err(error) = self.render() {
-            eprintln!("sim: rendering failed: {error}");
-            event_loop.exit();
-            return;
+        match self.render() {
+            Ok(FrameAcquireStatus::Acquired) => {}
+            Ok(FrameAcquireStatus::Timeout) => {
+                // A timeout is transient. Back off instead of retrying surface
+                // acquisition in a tight loop on the main thread.
+                self.next_redraw = now + self.frame_interval;
+                event_loop.set_control_flow(ControlFlow::WaitUntil(self.next_redraw));
+                return;
+            }
+            Ok(FrameAcquireStatus::Occluded) => {
+                // AppKit must regain control before an occluded Metal layer can
+                // become drawable. Exposure/redraw events will wake us again.
+                event_loop.set_control_flow(ControlFlow::Wait);
+                return;
+            }
+            Err(error) => {
+                eprintln!("sim: rendering failed: {error}");
+                event_loop.exit();
+                return;
+            }
         }
 
         self.next_redraw = now + self.frame_interval;

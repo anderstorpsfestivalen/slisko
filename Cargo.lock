@@ -845,8 +845,6 @@ dependencies = [
 [[package]]
 name = "ggez"
 version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f26dff5bfc8b251e7f25786bfc31774d68dcfb6c0cbdc0bcd53211e10c81bd53"
 dependencies = [
  "approx",
  "bitflags 2.13.1",

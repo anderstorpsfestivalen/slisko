@@ -1,0 +1,539 @@
+//! A cross-platform interface to the filesystem.
+//!
+//! This module provides access to files in specific places:
+//!
+//! * The `resources/` subdirectory in the same directory as the
+//!   program executable, if any,
+//! * The `resources.zip` file in the same
+//!   directory as the program executable, if any,
+//! * The root folder of the  game's "save" directory which is in a
+//!   platform-dependent location,
+//!   such as `~/.local/share/<gameid>/` on Linux.  The `gameid`
+//!   is the the string passed to
+//!   [`ContextBuilder::new()`](../struct.ContextBuilder.html#method.new).
+//!   Some platforms such as Windows also incorporate the `author` string into
+//!   the path.
+//!
+//! These locations will be searched for files in the order listed, and the first file
+//! found used.  That allows game assets to be easily distributed as an archive
+//! file, but locally overridden for testing or modding simply by putting
+//! altered copies of them in the game's `resources/` directory.  It
+//! is loosely based off of the `PhysicsFS` library.
+//!
+//! See the source of the [`files` example](https://github.com/ggez/ggez/blob/master/examples/files.rs) for more details.
+//!
+//! The names of `resources/` and `resources.zip` can be changed with the methods
+//! [`resources_dir_name`](../struct.ContextBuilder.html#method.resources_dir_name)
+//! and
+//! [`resources_zip_name`](../struct.ContextBuilder.html#method.resources_zip_name)
+//!  of `ContextBuilder`.
+//!
+//! Note that the file lookups WILL follow symlinks!  This module's
+//! directory isolation is intended for convenience, not security, so
+//! don't assume it will be secure.
+
+use crate::{
+    conf,
+    vfs::{self, OverlayFS, VFS},
+    GameError, GameResult,
+};
+use directories::ProjectDirs;
+use std::{
+    env,
+    io::{self, Read},
+    path,
+    sync::{Arc, RwLock},
+};
+
+pub use crate::vfs::OpenOptions;
+
+const CONFIG_NAME: &str = "/conf.toml";
+
+/// A structure that contains the filesystem state and cache.
+#[derive(Clone, Debug)]
+pub struct Filesystem {
+    vfs: Arc<RwLock<vfs::OverlayFS>>,
+    resources_dir: path::PathBuf,
+    zip_dir: path::PathBuf,
+    user_config_dir: path::PathBuf,
+    user_data_dir: path::PathBuf,
+}
+
+/// Represents a file, either in the filesystem, or in the resources zip file,
+/// or whatever.
+#[derive(Debug)]
+pub struct File(Box<dyn vfs::VFile>);
+
+impl io::Read for File {
+    #[inline]
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        self.0.read(buf)
+    }
+
+    #[inline]
+    fn read_exact(&mut self, buf: &mut [u8]) -> io::Result<()> {
+        self.0.read_exact(buf)
+    }
+
+    #[inline]
+    fn read_to_end(&mut self, buf: &mut Vec<u8>) -> io::Result<usize> {
+        self.0.read_to_end(buf)
+    }
+
+    #[inline]
+    fn read_to_string(&mut self, buf: &mut String) -> io::Result<usize> {
+        self.0.read_to_string(buf)
+    }
+}
+
+impl io::Write for File {
+    #[inline]
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.0.write(buf)
+    }
+
+    #[inline]
+    fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
+        self.0.write_all(buf)
+    }
+
+    #[inline]
+    fn flush(&mut self) -> io::Result<()> {
+        self.0.flush()
+    }
+}
+
+impl io::Seek for File {
+    #[inline]
+    fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
+        self.0.seek(pos)
+    }
+
+    #[inline]
+    fn stream_position(&mut self) -> io::Result<u64> {
+        self.0.stream_position()
+    }
+}
+
+impl Filesystem {
+    /// Create a new `Filesystem` instance, using the given `id` and (on
+    /// some platforms) the `author` as a portion of the user
+    /// directory path.  This function is called automatically by
+    /// ggez, the end user should never need to call it.
+    pub fn new<P: AsRef<path::Path>, Q: AsRef<path::Path>>(
+        id: &str,
+        author: &str,
+        resources_dir_name: P,
+        resources_zip_name: Q,
+    ) -> GameResult<Filesystem> {
+        Self::_new(
+            id,
+            author,
+            resources_dir_name.as_ref(),
+            resources_zip_name.as_ref(),
+        )
+    }
+
+    /// Actual implementation of `new`, without generics.
+    fn _new(
+        id: &str,
+        author: &str,
+        resources_dir_name: &path::Path,
+        resources_zip_name: &path::Path,
+    ) -> GameResult<Filesystem> {
+        let mut root_path = env::current_exe()?;
+
+        // Ditch the filename (if any)
+        if root_path.file_name().is_some() {
+            let _ = root_path.pop();
+        }
+
+        // Set up VFS to merge resource path, root path, and zip path.
+        let mut overlay = vfs::OverlayFS::new();
+
+        let mut resources_path;
+        let mut resources_zip_path;
+        let user_data_path;
+        let user_config_path;
+
+        let project_dirs = match ProjectDirs::from("", author, id) {
+            Some(dirs) => dirs,
+            None => {
+                return Err(GameError::FilesystemError(String::from(
+                    "No valid home directory path could be retrieved.",
+                )));
+            }
+        };
+
+        // <game exe root>/resources/
+        {
+            resources_path = root_path.clone();
+            resources_path.push(resources_dir_name);
+            trace!("Resources path: {resources_path:?}");
+            let physfs = vfs::PhysicalFS::new(&resources_path, true);
+            overlay.push_back(Box::new(physfs));
+        }
+
+        // <root>/resources.zip
+        {
+            resources_zip_path = root_path;
+            resources_zip_path.push(resources_zip_name);
+            if resources_zip_path.exists() {
+                trace!("Resources zip file: {resources_zip_path:?}");
+                let zipfs = vfs::ZipFS::new(&resources_zip_path)?;
+                overlay.push_back(Box::new(zipfs));
+            } else {
+                trace!("No resources zip file found");
+            }
+        }
+
+        // Per-user data dir,
+        // ~/.local/share/whatever/
+        {
+            user_data_path = project_dirs.data_local_dir();
+            trace!("User-local data path: {user_data_path:?}");
+            let physfs = vfs::PhysicalFS::new(user_data_path, true);
+            overlay.push_back(Box::new(physfs));
+        }
+
+        // Writeable local dir, ~/.config/whatever/
+        // Save game dir is read-write
+        {
+            user_config_path = project_dirs.config_dir();
+            trace!("User-local configuration path: {user_config_path:?}");
+            let physfs = vfs::PhysicalFS::new(user_config_path, false);
+            overlay.push_back(Box::new(physfs));
+        }
+
+        let fs = Filesystem {
+            vfs: Arc::new(RwLock::new(overlay)),
+            resources_dir: resources_path,
+            zip_dir: resources_zip_path,
+            user_config_dir: user_config_path.to_path_buf(),
+            user_data_dir: user_data_path.to_path_buf(),
+        };
+
+        Ok(fs)
+    }
+
+    fn vfs(&self) -> impl std::ops::Deref<Target = OverlayFS> + '_ {
+        self.vfs.read().unwrap()
+    }
+
+    fn vfs_mut(&self) -> impl std::ops::DerefMut<Target = OverlayFS> + '_ {
+        self.vfs.write().unwrap()
+    }
+
+    /// Opens the given `path` and returns the resulting `File`
+    /// in read-only mode.
+    pub fn open<P: AsRef<path::Path>>(&self, path: P) -> GameResult<File> {
+        self.vfs().open(path.as_ref()).map(File)
+    }
+
+    /// Opens a file in the user directory with the given
+    /// [`filesystem::OpenOptions`](struct.OpenOptions.html).
+    /// Note that even if you open a file read-write, it can only
+    /// write to files in the "user" directory.
+    pub fn open_options<P: AsRef<path::Path>>(
+        &self,
+        path: P,
+        options: OpenOptions,
+    ) -> GameResult<File> {
+        self.vfs()
+            .open_options(path.as_ref(), options)
+            .map(File)
+            .map_err(|e| {
+                GameError::ResourceLoadError(format!(
+                    "Tried to open {:?} but got error: {:?}",
+                    path.as_ref(),
+                    e
+                ))
+            })
+    }
+
+    /// Creates a new file in the user directory and opens it
+    /// to be written to, truncating it if it already exists.
+    pub fn create<P: AsRef<path::Path>>(&self, path: P) -> GameResult<File> {
+        self.vfs().create(path.as_ref()).map(File)
+    }
+
+    /// Reads the whole content of a file to a `Vec`.
+    pub fn read<P: AsRef<path::Path>>(&self, path: P) -> GameResult<Vec<u8>> {
+        let mut file = self.open(path)?;
+        let mut buf = Vec::new();
+        let _ = file.read_to_end(&mut buf)?;
+        Ok(buf)
+    }
+
+    /// Reads the whole content of a file to a `String`.
+    pub fn read_to_string<P: AsRef<path::Path>>(&self, path: P) -> GameResult<String> {
+        let mut file = self.open(path)?;
+        let mut buf = String::new();
+        let _ = file.read_to_string(&mut buf)?;
+        Ok(buf)
+    }
+
+    /// Create an empty directory in the user dir
+    /// with the given name.  Any parents to that directory
+    /// that do not exist will be created.
+    pub fn create_dir<P: AsRef<path::Path>>(&self, path: P) -> GameResult {
+        self.vfs().mkdir(path.as_ref())
+    }
+
+    /// Deletes the specified file in the user dir.
+    pub fn delete<P: AsRef<path::Path>>(&self, path: P) -> GameResult {
+        self.vfs().rm(path.as_ref())
+    }
+
+    /// Deletes the specified directory in the user dir,
+    /// and all its contents!
+    pub fn delete_dir<P: AsRef<path::Path>>(&self, path: P) -> GameResult {
+        self.vfs().rmrf(path.as_ref())
+    }
+
+    /// Check whether a file or directory exists.
+    pub fn exists<P: AsRef<path::Path>>(&self, path: P) -> bool {
+        self.vfs().exists(path.as_ref())
+    }
+
+    /// Check whether a path points at a file.
+    pub fn is_file<P: AsRef<path::Path>>(&self, path: P) -> bool {
+        self.vfs()
+            .metadata(path.as_ref())
+            .map(|m| m.is_file())
+            .unwrap_or(false)
+    }
+
+    /// Check whether a path points at a directory.
+    pub fn is_dir<P: AsRef<path::Path>>(&self, path: P) -> bool {
+        self.vfs()
+            .metadata(path.as_ref())
+            .map(|m| m.is_dir())
+            .unwrap_or(false)
+    }
+
+    /// Returns a list of all files and directories in the resource directory,
+    /// in no particular order.
+    ///
+    /// Lists the base directory if an empty path is given.
+    pub fn read_dir<P: AsRef<path::Path>>(&self, path: P) -> GameResult<Vec<path::PathBuf>> {
+        let mut paths = Vec::new();
+        self.vfs().read_dir(path.as_ref(), &mut paths)?;
+        Ok(paths)
+    }
+
+    fn write_to_string(&self) -> String {
+        use std::fmt::Write;
+        let mut s = String::new();
+        for vfs in self.vfs().roots() {
+            write!(s, "Source {vfs:?}").expect("Could not write to string; should never happen?");
+            match self.read_dir("/") {
+                Ok(files) => {
+                    for itm in files {
+                        write!(s, "  {itm:?}")
+                            .expect("Could not write to string; should never happen?");
+                    }
+                }
+                Err(e) => write!(s, " Could not read source: {e:?}")
+                    .expect("Could not write to string; should never happen?"),
+            }
+        }
+        s
+    }
+
+    /// Prints the contents of all data directories
+    /// to standard output.  Useful for debugging.
+    pub fn print_all(&self) {
+        println!("{}", self.write_to_string());
+    }
+
+    /// Outputs the contents of all data directories,
+    /// using the "info" log level of the [`log`](https://docs.rs/log/) crate.
+    /// Useful for debugging.
+    pub fn log_all(&self) {
+        info!("{}", self.write_to_string());
+    }
+
+    /// Adds the given (absolute) path to the list of directories
+    /// it will search to look for resources.
+    ///
+    /// You probably shouldn't use this in the general case, since it is
+    /// harder than it looks to make it bulletproof across platforms.
+    /// But it can be very nice for debugging and dev purposes, such as
+    /// by pushing `$CARGO_MANIFEST_DIR/resources` to it
+    pub fn mount(&self, path: &path::Path, readonly: bool) {
+        let physfs = vfs::PhysicalFS::new(path, readonly);
+        trace!("Mounting new path: {physfs:?}");
+        self.vfs_mut().push_back(Box::new(physfs));
+    }
+
+    /// Adds any object that implements Read + Seek as a zip file.
+    ///
+    /// Note: This is not intended for system files for the same reasons as
+    /// for `.mount()`. Rather, it can be used to read zip files from sources
+    /// such as `std::io::Cursor::new(includes_bytes!(...))` in order to embed
+    /// resources into the game's executable.
+    pub fn add_zip_file<R: io::Read + io::Seek + Send + 'static>(&self, reader: R) -> GameResult {
+        let zipfs = vfs::ZipFS::from_read(reader)?;
+        trace!("Adding zip file from reader");
+        self.vfs_mut().push_back(Box::new(zipfs));
+        Ok(())
+    }
+
+    /// Looks for a file named `/conf.toml` in any resource directory and
+    /// loads it if it finds it.
+    /// If it can't read it for some reason, returns an error.
+    pub fn read_config(&self) -> GameResult<conf::Conf> {
+        let conf_path = path::Path::new(CONFIG_NAME);
+        if self.is_file(conf_path) {
+            let mut file = self.open(conf_path)?;
+            let c = conf::Conf::from_toml_file(&mut file)?;
+            Ok(c)
+        } else {
+            Err(GameError::ConfigError(String::from(
+                "Config file not found",
+            )))
+        }
+    }
+
+    /// Takes a `Conf` object and saves it to the user directory,
+    /// overwriting any file already there.
+    pub fn write_config(&self, conf: &conf::Conf) -> GameResult {
+        let conf_path = path::Path::new(CONFIG_NAME);
+        let mut file = self.create(conf_path)?;
+        conf.to_toml_file(&mut file)?;
+        if self.is_file(conf_path) {
+            Ok(())
+        } else {
+            Err(GameError::ConfigError(format!(
+                "Failed to write config file at {}",
+                conf_path.to_string_lossy()
+            )))
+        }
+    }
+
+    /// Returns the full path to the resource directory
+    /// (even if it doesn't exist)
+    pub fn resources_dir(&self) -> &path::Path {
+        &self.resources_dir
+    }
+
+    /// Get a reference to the filesystem's zip dir.
+    pub fn zip_dir(&self) -> &path::Path {
+        &self.zip_dir
+    }
+
+    /// Return the full path to the user config directory.
+    pub fn user_config_dir(&self) -> &path::Path {
+        &self.user_config_dir
+    }
+
+    /// Return the full path to the user data directory.
+    pub fn user_data_dir(&self) -> &path::Path {
+        &self.user_data_dir
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::conf;
+    use crate::error::GameError;
+    use crate::filesystem::{env, vfs, Arc, Filesystem, RwLock, CONFIG_NAME};
+    use std::io::{Read, Write};
+    use std::path;
+
+    fn dummy_fs_for_tests() -> Filesystem {
+        let mut path = path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        path.push("resources");
+        let physfs = vfs::PhysicalFS::new(&path, false);
+        let mut ofs = vfs::OverlayFS::new();
+        ofs.push_front(Box::new(physfs));
+        Filesystem {
+            vfs: Arc::new(RwLock::new(ofs)),
+
+            resources_dir: "".into(),
+            zip_dir: "".into(),
+            user_config_dir: "".into(),
+            user_data_dir: "".into(),
+        }
+    }
+
+    #[test]
+    fn headless_test_file_exists() {
+        let f = dummy_fs_for_tests();
+
+        let tile_file = path::Path::new("/tile.png");
+        assert!(f.exists(tile_file));
+        assert!(f.is_file(tile_file));
+
+        let tile_file = path::Path::new("/oglebog.png");
+        assert!(!f.exists(tile_file));
+        assert!(!f.is_file(tile_file));
+        assert!(!f.is_dir(tile_file));
+    }
+
+    #[test]
+    fn headless_test_read_dir() {
+        let f = dummy_fs_for_tests();
+
+        let dir_contents_size = f.read_dir("/").unwrap().len();
+        assert!(dir_contents_size > 0);
+    }
+
+    #[test]
+    fn headless_test_create_delete_file() {
+        let fs = dummy_fs_for_tests();
+        let test_file = path::Path::new("/testfile.txt");
+        let bytes = b"test";
+
+        {
+            let mut file = fs.create(test_file).unwrap();
+            let _ = file.write(bytes).unwrap();
+        }
+        {
+            let mut buffer = Vec::new();
+            let mut file = fs.open(test_file).unwrap();
+            let _ = file.read_to_end(&mut buffer).unwrap();
+            assert_eq!(bytes, buffer.as_slice());
+        }
+
+        fs.delete(test_file).unwrap();
+    }
+
+    #[test]
+    fn headless_test_file_not_found() {
+        let fs = dummy_fs_for_tests();
+        {
+            let rel_file = "testfile.txt";
+            match fs.open(rel_file) {
+                Err(GameError::ResourceNotFound(_, _)) => (),
+                Err(e) => panic!("Invalid error for opening file with relative path: {e:?}"),
+                Ok(f) => panic!("Should have gotten an error but instead got {f:?}!"),
+            }
+        }
+
+        {
+            // This absolute path should work on Windows too since we
+            // completely remove filesystem roots.
+            match fs.open("/ooglebooglebarg.txt") {
+                Err(GameError::ResourceNotFound(_, _)) => (),
+                Err(e) => panic!("Invalid error for opening nonexistent file: {e}"),
+                Ok(f) => panic!("Should have gotten an error but instead got {f:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn headless_test_write_config() {
+        let f = dummy_fs_for_tests();
+        let conf = conf::Conf::new();
+        // The config file should end up in
+        // the resources directory with this
+        match f.write_config(&conf) {
+            Ok(_) => (),
+            Err(e) => panic!("{e:?}"),
+        }
+        // Remove the config file!
+        f.delete(CONFIG_NAME).unwrap();
+    }
+}
