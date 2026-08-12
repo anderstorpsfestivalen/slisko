@@ -16,7 +16,7 @@ use std::time::{Duration, Instant};
 use clap::Parser;
 use ddp_rs::packet::PacketRef;
 use ddp_rs::protocol::{Header, ID, PixelConfig};
-use engine::chassi::Chassi;
+use engine::chassi::{CARD_PITCH, CHASSIS_HEIGHT, Chassi};
 use engine::output::StrandMap;
 use ggez::conf::{WindowMode, WindowSetup};
 use ggez::event;
@@ -29,8 +29,6 @@ use ggez::winit::keyboard::{Key, NamedKey};
 use ggez::winit::window::WindowId;
 use ggez::{Context, ContextBuilder, GameError, GameResult};
 
-const CARD_PITCH: f32 = 108.0;
-const CHASSIS_HEIGHT: f32 = 1000.0;
 const RECEIVE_TIMEOUT: Duration = Duration::from_millis(250);
 const PARTIAL_FRAME_TTL: Duration = Duration::from_secs(2);
 

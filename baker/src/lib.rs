@@ -1106,12 +1106,9 @@ mod tests {
             BakedButtonAction::Momentary
         ));
         assert_eq!(baked.buttons[1].patterns, ["strobe"]);
-        assert!(matches!(
-            baked.buttons[2].action,
-            BakedButtonAction::Momentary
-        ));
+        assert!(matches!(baked.buttons[2].action, BakedButtonAction::Change));
         assert_eq!(baked.buttons[2].gpio, 32);
-        assert_eq!(baked.buttons[2].patterns, ["lamp-test"]);
+        assert_eq!(baked.buttons[2].patterns, ["pride"]);
         let rendered = baked.render();
         syn::parse_file(&rendered).expect("rendered 9010 configuration must be valid Rust");
         assert!(rendered.contains("pub const LED_COUNT: usize = 145;"));

@@ -17,6 +17,11 @@ use alloc::vec::Vec;
 
 use crate::pixel::{Pixel, Position};
 
+/// Horizontal spacing between adjacent linecard images in chassis space.
+pub const CARD_PITCH: f32 = 108.0;
+/// Height of the linecard artwork and the shared chassis coordinate system.
+pub const CHASSIS_HEIGHT: f32 = 1000.0;
+
 /// Static description of one linecard, emitted by the baker. Indices in
 /// `link`, `status`, and `labeled` are **card-local** (0-based within this
 /// card's LEDs); [`Chassi::from_specs`] converts them to absolute strand
@@ -166,6 +171,24 @@ impl Chassi {
     /// Card names in order (mirrors `GetCardOrder`).
     pub fn card_order(&self) -> Vec<&'static str> {
         self.linecards.iter().map(|lc| lc.name).collect()
+    }
+
+    /// Position of every LED in full-chassis space, in strand order.
+    ///
+    /// Baked LED positions are local to their linecard. The chassis and
+    /// simulator place each card one [`CARD_PITCH`] apart horizontally.
+    pub fn chassis_positions(&self) -> Vec<Position> {
+        let mut positions = Vec::with_capacity(self.leds.len());
+        for (card_index, card) in self.linecards.iter().enumerate() {
+            let x_offset = card_index as f32 * CARD_PITCH;
+            for pixel in &self.leds[card.led_offset..card.led_offset + card.led_count] {
+                positions.push(Position {
+                    x: pixel.pos.x + x_offset,
+                    ..pixel.pos
+                });
+            }
+        }
+        positions
     }
 
     /// The strand index of a label on a specific linecard, if present.

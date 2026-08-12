@@ -39,8 +39,8 @@ Buttons = [
     { name = "RSP0 ACO",       pin = "GPIO17", action = "change",    patterns = ["greenstatus", "a9k-40ge-l", "a9k-8t-l", "a9k-rsp440-tr"] },
     # Run an aggressive full-chassis white strobe only while held.
     { name = "RSP1 ACO",       pin = "GPIO33", action = "momentary", patterns = ["strobe"] },
-    # Run the four-color lamp test only while held.
-    { name = "RSP0 LAMP TEST", pin = "GPIO32", action = "momentary", patterns = ["lamp-test"] },
+    # Select the spatial six-color pride flag.
+    { name = "RSP0 LAMP TEST", pin = "GPIO32", action = "change", patterns = ["pride"] },
 ]
 
 [traffic_shaper]
