@@ -2,6 +2,10 @@
 CONFIG_ESP_MAIN_TASK_STACK_SIZE=24000
 CONFIG_PTHREAD_TASK_STACK_SIZE_DEFAULT=8192
 
+# 120 FPS needs an 8.33 ms frame period. A 1 kHz scheduler tick makes the
+# deadline pacer precise enough while still yielding time to network services.
+CONFIG_FREERTOS_HZ=1000
+
 CONFIG_MBEDTLS_CERTIFICATE_BUNDLE=y
 CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_FULL=y
 

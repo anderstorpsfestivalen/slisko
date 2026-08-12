@@ -16,7 +16,7 @@ mod time;
 
 use std::sync::{Arc, Mutex};
 
-use esp_idf_hal::delay::FreeRtos;
+use esp_idf_hal::delay::{FreeRtos, TickType};
 use esp_idf_hal::gpio::AnyOutputPin;
 use esp_idf_hal::peripherals::Peripherals;
 use esp_idf_svc::eventloop::EspSystemEventLoop;
@@ -40,7 +40,9 @@ use health::{Health, lock_recover};
 use output::Ws281xOutput;
 use recovery::FailureWindow;
 
-const FPS: u32 = 60;
+/// Firmware render/output rate. Everything else derives from this one value.
+const FPS: u32 = 120;
+const FRAME_PERIOD_US: i64 = 1_000_000 / FPS as i64;
 const SUPERVISOR_PERIOD_MS: u64 = 1_000;
 const OUTPUT_RESTART_MS: u64 = 10_000;
 const HARDWARE_RESTART_MS: u64 = 60_000;
@@ -233,11 +235,13 @@ fn run() -> Result<(), EspError> {
 
     // --- Render + supervision loop ---
     let start_us = unsafe { esp_timer_get_time() };
-    let frame_ms = (1000 / FPS).max(1);
     let mut mapped_leds = Vec::with_capacity(cfg::LED_COUNT);
     let mut next_supervision_ms = 0;
     let mut output_failures = FailureWindow::default();
     let mut last_output_log_ms = 0;
+    let mut next_frame_us = start_us;
+
+    info!("render: target {FPS} fps ({FRAME_PERIOD_US} us per frame)");
 
     loop {
         let now_ms = monotonic_ms();
@@ -302,7 +306,35 @@ fn run() -> Result<(), EspError> {
 
         health.update(|state| state.frames = state.frames.wrapping_add(1));
         feed_watchdog();
-        FreeRtos::delay_ms(frame_ms);
+        next_frame_us = next_frame_us.saturating_add(FRAME_PERIOD_US);
+        let frame_finished_us = unsafe { esp_timer_get_time() };
+        if next_frame_us < frame_finished_us {
+            // Drop missed frame slots instead of producing a catch-up burst.
+            next_frame_us = frame_finished_us;
+        } else {
+            wait_until(next_frame_us);
+        }
+    }
+}
+
+/// Pace frames against an absolute microsecond deadline so rendering and LED
+/// transmission consume part of the frame budget instead of extending it.
+fn wait_until(deadline_us: i64) {
+    loop {
+        let remaining_us = deadline_us.saturating_sub(unsafe { esp_timer_get_time() });
+        if remaining_us <= 0 {
+            return;
+        }
+
+        // Yield whole scheduler ticks, then use the ESP ROM delay for the final
+        // sub-tick remainder. Keeping one tick in reserve avoids oversleeping.
+        let tick_us = 1_000_000 / i64::from(esp_idf_hal::delay::TICK_RATE_HZ);
+        if remaining_us > tick_us {
+            let ticks = (remaining_us / tick_us).saturating_sub(1);
+            unsafe { esp_idf_svc::sys::vTaskDelay(TickType::new(ticks as _).ticks()) };
+        } else {
+            esp_idf_hal::delay::Ets::delay_us(remaining_us as u32);
+        }
     }
 }
 

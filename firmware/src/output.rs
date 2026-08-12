@@ -67,13 +67,13 @@ struct Strip<'d> {
     tx: TxChannelDriver<'d>,
     range: Range<usize>,
     order: ColorOrder,
-    enc_cfg: BytesEncoderConfig,
+    encoder: BytesEncoder,
+    bytes: Vec<u8>,
 }
 
 /// All WS281x outputs on the board (up to 8 RMT channels).
 pub struct Ws281xOutput<'d> {
     strips: Vec<Strip<'d>>,
-    scratch: Vec<u8>,
 }
 
 impl<'d> Ws281xOutput<'d> {
@@ -94,43 +94,56 @@ impl<'d> Ws281xOutput<'d> {
         let mut strips = Vec::with_capacity(outputs.len());
         for (pin, range) in outputs {
             let tx = TxChannelDriver::new(pin, &ch_cfg)?;
+            let encoder = BytesEncoder::with_config(&enc_cfg)?;
             strips.push(Strip {
                 tx,
                 range,
                 order,
-                enc_cfg: enc_cfg.clone(),
+                encoder,
+                bytes: Vec::new(),
             });
         }
-        Ok(Self {
-            strips,
-            scratch: Vec::new(),
-        })
+        Ok(Self { strips })
     }
 
-    /// Encode and transmit the pixel buffer to every channel (blocking per
-    /// channel). Ranges are clamped to the buffer length defensively.
+    /// Encode all strips, start every RMT channel, then wait for all of them.
+    /// The channels therefore transmit in parallel instead of serially.
     pub fn write(&mut self, leds: &[Pixel]) -> Result<(), EspError> {
         let tx_cfg = TransmitConfig::default();
-        for strip in &mut self.strips {
+        for index in 0..self.strips.len() {
+            let strip = &mut self.strips[index];
             let end = strip.range.end.min(leds.len());
             let start = strip.range.start.min(end);
-            encode_ws281x(&leds[start..end], strip.order, &mut self.scratch);
-            if self.scratch.is_empty() {
+            encode_ws281x(&leds[start..end], strip.order, &mut strip.bytes);
+            if strip.bytes.is_empty() {
                 continue;
             }
-            let mut encoder = BytesEncoder::with_config(&strip.enc_cfg)?;
 
             // Use the raw ESP-IDF encoder directly. esp-idf-hal 0.46.2's
             // `send_and_wait` adapter treats `rmt_encode_state_t` as an enum,
             // but ESP-IDF defines it as bitflags and legitimately returns
-            // COMPLETE | MEM_FULL for longer WS281x frames. Converting that
-            // value panics from the RMT ISR. Waiting here keeps both the
-            // encoder and scratch buffer alive until the transaction finishes.
-            unsafe {
-                strip.tx.start_send(&mut encoder, &self.scratch, &tx_cfg)?;
+            // COMPLETE | MEM_FULL for longer WS281x frames.
+            let started = unsafe {
+                strip
+                    .tx
+                    .start_send(&mut strip.encoder, &strip.bytes, &tx_cfg)
+            };
+            if let Err(error) = started {
+                for active in &mut self.strips[..index] {
+                    let _ = active.tx.wait_all_done(None);
+                }
+                return Err(error);
             }
-            strip.tx.wait_all_done(None)?;
         }
-        Ok(())
+
+        let mut result = Ok(());
+        for strip in &mut self.strips {
+            if let Err(error) = strip.tx.wait_all_done(None)
+                && result.is_ok()
+            {
+                result = Err(error);
+            }
+        }
+        result
     }
 }
