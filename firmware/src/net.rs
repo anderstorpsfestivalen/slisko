@@ -20,7 +20,7 @@ use esp_idf_svc::sys::{
     ESP_ERR_ESP_NETIF_DHCP_ALREADY_STARTED, ESP_OK, EspError, esp_netif_dhcp_status_t,
     esp_netif_dhcp_status_t_ESP_NETIF_DHCP_INIT, esp_netif_dhcp_status_t_ESP_NETIF_DHCP_STARTED,
     esp_netif_dhcp_status_t_ESP_NETIF_DHCP_STOPPED, esp_netif_dhcpc_get_status,
-    esp_netif_dhcpc_start,
+    esp_netif_dhcpc_start, esp_netif_set_default_netif,
 };
 use esp_idf_svc::wifi::{AuthMethod, ClientConfiguration, Configuration, EspWifi, WifiDriver};
 use log::{info, warn};
@@ -101,6 +101,7 @@ pub struct NetworkManager {
     last_link: bool,
     last_eth_ip_up: bool,
     last_network_ip_up: bool,
+    last_default_route: &'static str,
 }
 
 impl NetworkManager {
@@ -157,6 +158,7 @@ impl NetworkManager {
             last_link: false,
             last_eth_ip_up: false,
             last_network_ip_up: false,
+            last_default_route: "none",
         };
 
         info!(
@@ -191,6 +193,7 @@ impl NetworkManager {
             ("none", None)
         };
         let ip_up = active_ip.is_some();
+        self.select_default_route(active);
 
         self.update_wifi_health(ethernet.ip_up, wifi_ip);
         self.health.update(|health| {
@@ -205,6 +208,32 @@ impl NetworkManager {
         };
         self.last_network_ip_up = ip_up;
         status
+    }
+
+    fn select_default_route(&mut self, active: &'static str) {
+        if active == "none" || active == self.last_default_route {
+            return;
+        }
+        let netif = match active {
+            "ethernet" => self.eth.netif().handle(),
+            "wifi" => {
+                let Some(wifi) = self.wifi.as_ref() else {
+                    return;
+                };
+                wifi.sta_netif().handle()
+            }
+            _ => return,
+        };
+
+        let result = unsafe { esp_netif_set_default_netif(netif) };
+        if result == ESP_OK {
+            info!("network: default outbound route = {active}");
+            self.last_default_route = active;
+        } else {
+            warn!("network: failed to select {active} as default route ({result})");
+            self.health
+                .record_error(format!("Default route switch to {active} failed: {result}"));
+        }
     }
 
     fn poll_ethernet(&mut self, now_ms: u64) -> EthernetStatus {
