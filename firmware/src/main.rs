@@ -1,17 +1,19 @@
 //! slisko firmware for the bong69 / WT32-ETH01 board (ESP32, esp-idf std).
 //!
-//! LED rendering is the primary service. Ethernet, DHCP, SNTP, DDP, HTTP,
-//! mDNS, and buttons are supervised around it and may degrade without stopping
-//! patterns.
+//! LED rendering is the primary service. Ethernet, WiFi fallback, DHCP, SNTP,
+//! DDP, HTTP, mDNS, and buttons are supervised around it and may degrade
+//! without stopping patterns.
 
 mod apa102;
 mod board;
 mod buttons;
+mod credentials;
 mod ddp;
 mod health;
 mod http;
 mod mdns;
 mod net;
+mod network_policy;
 mod output;
 mod recovery;
 mod time;
@@ -23,6 +25,7 @@ use esp_idf_hal::gpio::AnyOutputPin;
 use esp_idf_hal::peripherals::Peripherals;
 use esp_idf_svc::eventloop::EspSystemEventLoop;
 use esp_idf_svc::log::EspLogger;
+use esp_idf_svc::nvs::EspDefaultNvsPartition;
 use esp_idf_svc::sys::{
     ESP_ERR_INVALID_STATE, ESP_OK, EspError, esp_random, esp_restart, esp_task_wdt_add,
     esp_task_wdt_config_t, esp_task_wdt_init, esp_task_wdt_reconfigure, esp_task_wdt_reset,
@@ -89,6 +92,7 @@ fn run() -> Result<(), EspError> {
 
     let peripherals = Peripherals::take()?;
     let sysloop = EspSystemEventLoop::take()?;
+    let nvs = EspDefaultNvsPartition::take()?;
     let pins = peripherals.pins;
 
     // --- Physical outputs ---
@@ -188,8 +192,10 @@ fn run() -> Result<(), EspError> {
         );
     }
 
-    // --- Ethernet. Construction failures require a reboot to reacquire pins,
-    // but patterns remain active for a minute before that recovery action. ---
+    // --- Ethernet-preferred networking. Ethernet construction failures require
+    // a reboot to reacquire pins, but patterns remain active for a minute before
+    // that recovery action. WiFi starts only after Ethernet has lacked an IP for
+    // 30 seconds and is stopped again once Ethernet DHCP recovers. ---
     let eth_pins = net::EthPins {
         mac: peripherals.mac,
         gpio0: pins.gpio0,
@@ -204,20 +210,26 @@ fn run() -> Result<(), EspError> {
         gpio27: pins.gpio27,
     };
     let now_ms = monotonic_ms();
-    let (mut network, hardware_restart_at) =
-        match net::NetworkManager::new(eth_pins, sysloop, health.clone(), now_ms) {
-            Ok(manager) => (Some(manager), None),
-            Err(error) => {
-                warn!("ethernet construction failed: {error:?}; patterns remain active");
-                health.update(|state| {
-                    state.ethernet_driver = "failed";
-                    state.ethernet_link = "down";
-                    state.dhcp = "unavailable";
-                    state.last_error = Some(format!("Ethernet construction failed: {error:?}"));
-                });
-                (None, Some(now_ms.saturating_add(HARDWARE_RESTART_MS)))
-            }
-        };
+    let (mut network, hardware_restart_at) = match net::NetworkManager::new(
+        eth_pins,
+        peripherals.modem,
+        sysloop,
+        nvs,
+        health.clone(),
+        now_ms,
+    ) {
+        Ok(manager) => (Some(manager), None),
+        Err(error) => {
+            warn!("ethernet construction failed: {error:?}; patterns remain active");
+            health.update(|state| {
+                state.ethernet_driver = "failed";
+                state.ethernet_link = "down";
+                state.dhcp = "unavailable";
+                state.last_error = Some(format!("Ethernet construction failed: {error:?}"));
+            });
+            (None, Some(now_ms.saturating_add(HARDWARE_RESTART_MS)))
+        }
+    };
 
     let mut timesync = time::TimeSync::new(health.clone());
 

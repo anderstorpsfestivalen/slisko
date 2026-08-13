@@ -96,6 +96,8 @@ after. From `firmware`:
 
 ```sh
 cd firmware
+cp src/credentials.example.rs src/credentials.rs
+# Edit WIFI_NETWORKS in src/credentials.rs; this local file is gitignored.
 cargo build                       # first build bootstraps ESP-IDF
 ```
 

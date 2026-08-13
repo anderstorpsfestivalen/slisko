@@ -246,7 +246,7 @@
 					><span id="output-errors" class="sub">—</span>
 				</div>
 				<div class="metric">
-					<span class="label">ip address</span
+					<span class="label">network</span
 					><strong id="ip" class="value">—</strong
 					><span id="network" class="sub">waiting for network</span>
 				</div>
@@ -395,12 +395,16 @@
 					$("output-errors").textContent =
 						num.format(h.render.total_output_errors) +
 						" output errors";
-					$("ip").textContent = h.ethernet.ip || "not assigned";
+					$("ip").textContent = h.network.ip || "not assigned";
 					$("network").textContent =
-						"link " +
+						h.network.active +
+						" · Ethernet " +
 						h.ethernet.link +
-						" · DHCP " +
-						h.ethernet.dhcp;
+						"/" +
+						h.ethernet.dhcp +
+						" · WiFi " +
+						h.wifi.state +
+						(h.wifi.ssid ? " (" + h.wifi.ssid + ")" : "");
 					$("ntp").textContent = h.ntp.state;
 					$("sync").textContent =
 						h.ntp.last_sync_age_s == null

@@ -28,11 +28,17 @@ pub struct HealthSnapshot {
     pub frames: u32,
     pub consecutive_output_errors: u32,
     pub total_output_errors: u32,
+    pub network_active: &'static str,
+    pub network_ip: Option<String>,
     pub ethernet_driver: &'static str,
     pub ethernet_link: &'static str,
     pub dhcp: &'static str,
     pub ip: Option<String>,
     pub dhcp_repair_attempts: u32,
+    pub wifi_state: &'static str,
+    pub wifi_ssid: Option<String>,
+    pub wifi_ip: Option<String>,
+    pub wifi_attempts: u32,
     pub ntp_state: &'static str,
     pub ntp_ever_synced: bool,
     pub ntp_last_sync_ms: Option<u64>,
@@ -51,11 +57,17 @@ impl HealthSnapshot {
             frames: 0,
             consecutive_output_errors: 0,
             total_output_errors: 0,
+            network_active: "none",
+            network_ip: None,
             ethernet_driver: "starting",
             ethernet_link: "unknown",
             dhcp: "waiting",
             ip: None,
             dhcp_repair_attempts: 0,
+            wifi_state: "disabled",
+            wifi_ssid: None,
+            wifi_ip: None,
+            wifi_attempts: 0,
             ntp_state: "waiting_for_network",
             ntp_ever_synced: false,
             ntp_last_sync_ms: None,
@@ -81,9 +93,8 @@ impl HealthSnapshot {
             .map(|sync| now_ms.saturating_sub(sync) / 1_000);
         let unix_time_s = self.ntp_ever_synced.then_some(unix_time_s).flatten();
         let healthy = self.consecutive_output_errors == 0
-            && self.ethernet_driver == "started"
-            && self.ethernet_link == "up"
-            && self.dhcp == "leased"
+            && self.network_active != "none"
+            && self.network_ip.is_some()
             && self.ntp_state == "synced"
             && self.http == ServiceState::Running
             && self.ddp == ServiceState::Running
@@ -95,7 +106,9 @@ impl HealthSnapshot {
                 "{{\"healthy\":{},\"uptime_s\":{},",
                 "\"source\":{{\"mode\":\"{}\",\"rendering\":\"{}\"}},",
                 "\"render\":{{\"frames\":{},\"consecutive_output_errors\":{},\"total_output_errors\":{}}},",
+                "\"network\":{{\"active\":\"{}\",\"ip\":{}}},",
                 "\"ethernet\":{{\"driver\":\"{}\",\"link\":\"{}\",\"dhcp\":\"{}\",\"ip\":{},\"repair_attempts\":{}}},",
+                "\"wifi\":{{\"state\":\"{}\",\"ssid\":{},\"ip\":{},\"attempts\":{}}},",
                 "\"ntp\":{{\"state\":\"{}\",\"ever_synced\":{},\"time_unix_s\":{},\"last_sync_age_s\":{},\"restart_attempts\":{}}},",
                 "\"services\":{{\"http\":\"{}\",\"ddp\":\"{}\",\"mdns\":\"{}\",\"buttons\":\"{}\"}},",
                 "\"last_error\":{}}}"
@@ -107,11 +120,17 @@ impl HealthSnapshot {
             self.frames,
             self.consecutive_output_errors,
             self.total_output_errors,
+            self.network_active,
+            json_option(self.network_ip.as_deref()),
             self.ethernet_driver,
             self.ethernet_link,
             self.dhcp,
             json_option(self.ip.as_deref()),
             self.dhcp_repair_attempts,
+            self.wifi_state,
+            json_option(self.wifi_ssid.as_deref()),
+            json_option(self.wifi_ip.as_deref()),
+            self.wifi_attempts,
             self.ntp_state,
             self.ntp_ever_synced,
             unix_time_s.map_or_else(|| "null".into(), |time| time.to_string()),
@@ -197,6 +216,10 @@ mod tests {
         assert!(json.contains("\"uptime_s\":3"));
         assert!(json.contains("\"time_unix_s\":null"));
         assert!(json.contains("\"source\":{\"mode\":\"ddp\",\"rendering\":\"internal\"}"));
+        assert!(json.contains("\"network\":{\"active\":\"none\",\"ip\":null}"));
+        assert!(json.contains(
+            "\"wifi\":{\"state\":\"disabled\",\"ssid\":null,\"ip\":null,\"attempts\":0}"
+        ));
         assert!(json.contains("\"mdns\":\"starting\""));
         assert!(json.contains("bad \\\"link\\\"\\n"));
     }
@@ -204,6 +227,8 @@ mod tests {
     #[test]
     fn health_json_becomes_healthy_when_every_service_is_ready() {
         let mut health = HealthSnapshot::new(0);
+        health.network_active = "ethernet";
+        health.network_ip = Some("10.0.0.2".into());
         health.ethernet_driver = "started";
         health.ethernet_link = "up";
         health.dhcp = "leased";
@@ -223,5 +248,26 @@ mod tests {
                 .to_json(0, Some(1_000), false, false)
                 .contains("\"time_unix_s\":1000")
         );
+    }
+
+    #[test]
+    fn wifi_can_be_the_healthy_active_transport() {
+        let mut health = HealthSnapshot::new(0);
+        health.network_active = "wifi";
+        health.network_ip = Some("192.168.1.42".into());
+        health.wifi_state = "connected";
+        health.wifi_ssid = Some("festival".into());
+        health.wifi_ip = health.network_ip.clone();
+        health.ntp_state = "synced";
+        health.ntp_ever_synced = true;
+        health.http = ServiceState::Running;
+        health.ddp = ServiceState::Running;
+        health.mdns = ServiceState::Running;
+        health.buttons = ServiceState::Running;
+
+        let json = health.to_json(0, Some(1_000), false, false);
+        assert!(json.contains("\"healthy\":true"));
+        assert!(json.contains("\"active\":\"wifi\""));
+        assert!(json.contains("\"ssid\":\"festival\""));
     }
 }

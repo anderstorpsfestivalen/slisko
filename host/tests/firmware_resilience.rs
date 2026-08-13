@@ -3,6 +3,8 @@
 // Rust test harness disabled.
 #[path = "../../firmware/src/health.rs"]
 mod health;
+#[path = "../../firmware/src/network_policy.rs"]
+mod network_policy;
 #[path = "../../firmware/src/recovery.rs"]
 mod recovery;
 
