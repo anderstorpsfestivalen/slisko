@@ -1,120 +1,434 @@
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>slisko · status</title>
-<style>
-:root{color-scheme:dark;font:15px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:#0a0a0a;color:#eee}
-*{box-sizing:border-box}
-::selection{background:#eee;color:#000}
-body{margin:0;background:#0a0a0a;color:#eee}
-main{width:min(960px,calc(100% - 32px));margin:0 auto;padding:42px 0 64px}
-header{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;margin-bottom:26px}
-h1{font-size:clamp(30px,6vw,54px);line-height:1;letter-spacing:-.06em;margin:5px 0 0}
-.eyebrow,.label,th{color:#8d8d8d;font-size:11px;letter-spacing:.12em;text-transform:uppercase}
-.state{display:flex;align-items:center;gap:8px;color:#ddd;white-space:nowrap}
-.state:before{content:"";width:9px;height:9px;border-radius:50%;background:#eee;box-shadow:0 0 0 3px #333}
-.state.off:before{background:#555;box-shadow:none}
-.grid{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid #383838;border-radius:10px;overflow:hidden;background:#151515}
-.metric{min-height:118px;padding:18px;border-right:1px solid #383838;border-bottom:1px solid #383838}
-.metric:nth-child(3),.metric:nth-child(7){border-right:0}.metric:nth-last-child(-n+4){border-bottom:0}
-.metric.wide{grid-column:span 2}
-.value{display:block;margin-top:12px;font-size:24px;line-height:1.25;letter-spacing:-.04em;overflow-wrap:anywhere}
-.sub{display:block;color:#999;font-size:12px;margin-top:7px}
-section{margin-top:34px}
-h2{font-size:15px;margin:0 0 12px;letter-spacing:.02em}
-.detail{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.panel{border:1px solid #383838;border-radius:8px;padding:16px 18px;background:#111}
-.panel p{margin:0;color:#aaa}.panel p+p{margin-top:8px}
-#error{color:#ddd;border-left:2px solid #777;padding-left:10px}
-.hidden{display:none}
-.table{border:1px solid #383838;border-radius:8px;overflow-x:auto}
-table{width:100%;border-collapse:collapse;background:#111}
-th,td{text-align:left;padding:12px 14px;border-bottom:1px solid #333;vertical-align:top}
-tr:last-child td{border-bottom:0}th{font-weight:400;background:#181818}
-td:first-child{white-space:nowrap}td:nth-child(2){color:#aaa}
-code,a{color:#eee}a{text-decoration-color:#666;text-underline-offset:3px}a:focus-visible{outline:2px solid #eee;outline-offset:3px}
-footer{color:#777;font-size:12px;margin-top:18px}
-@media(max-width:720px){main{padding-top:28px}.grid{grid-template-columns:1fr 1fr}.metric:nth-child(n){border-right:1px solid #383838;border-bottom:1px solid #383838}.metric:nth-child(odd){border-right:0}.metric:nth-last-child(-n+2){border-bottom:0}.detail{grid-template-columns:1fr}}
-@media(max-width:460px){header{align-items:flex-start;flex-direction:column}.grid{display:block}.metric:nth-child(n){border:0;border-bottom:1px solid #383838}.metric:last-child{border-bottom:0}.metric{min-height:100px}}
-</style>
-</head>
-<body>
-<main>
-<header>
- <div><div class="eyebrow">device monitor</div><h1>slisko</h1></div>
- <div id="connection" class="state off" role="status">connecting</div>
-</header>
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width,initial-scale=1" />
+		<title>slisko · status</title>
+		<style>
+			:root {
+				color-scheme: dark;
+				font:
+					15px/1.5 ui-monospace,
+					SFMono-Regular,
+					Menlo,
+					Consolas,
+					monospace;
+				background: #0a0a0a;
+				color: #eee;
+			}
+			* {
+				box-sizing: border-box;
+			}
+			::selection {
+				background: #eee;
+				color: #000;
+			}
+			body {
+				margin: 0;
+				background: #0a0a0a;
+				color: #eee;
+			}
+			main {
+				width: min(960px, calc(100% - 32px));
+				margin: 0 auto;
+				padding: 42px 0 64px;
+			}
+			header {
+				display: flex;
+				align-items: flex-end;
+				justify-content: space-between;
+				gap: 24px;
+				margin-bottom: 26px;
+			}
+			h1 {
+				font-size: clamp(30px, 6vw, 54px);
+				line-height: 1;
+				letter-spacing: -0.06em;
+				margin: 5px 0 0;
+			}
+			.eyebrow,
+			.label,
+			th {
+				color: #8d8d8d;
+				font-size: 11px;
+				letter-spacing: 0.12em;
+				text-transform: uppercase;
+			}
+			.state {
+				display: flex;
+				align-items: center;
+				gap: 8px;
+				color: #ddd;
+				white-space: nowrap;
+			}
+			.state:before {
+				content: "";
+				width: 9px;
+				height: 9px;
+				border-radius: 50%;
+				background: #eee;
+				box-shadow: 0 0 0 3px #333;
+			}
+			.state.off:before {
+				background: #555;
+				box-shadow: none;
+			}
+			.grid {
+				display: grid;
+				grid-template-columns: repeat(4, 1fr);
+				border: 1px solid #383838;
+				border-radius: 10px;
+				overflow: hidden;
+				background: #151515;
+			}
+			.metric {
+				min-height: 118px;
+				padding: 18px;
+				border-right: 1px solid #383838;
+				border-bottom: 1px solid #383838;
+			}
+			.metric:nth-child(3),
+			.metric:nth-child(7) {
+				border-right: 0;
+			}
+			.metric:nth-last-child(-n + 4) {
+				border-bottom: 0;
+			}
+			.metric.wide {
+				grid-column: span 2;
+			}
+			.value {
+				display: block;
+				margin-top: 12px;
+				font-size: 24px;
+				line-height: 1.25;
+				letter-spacing: -0.04em;
+				overflow-wrap: anywhere;
+			}
+			.sub {
+				display: block;
+				color: #999;
+				font-size: 12px;
+				margin-top: 7px;
+			}
+			section {
+				margin-top: 34px;
+			}
+			h2 {
+				font-size: 15px;
+				margin: 0 0 12px;
+				letter-spacing: 0.02em;
+			}
+			.table {
+				border: 1px solid #383838;
+				border-radius: 8px;
+				overflow-x: auto;
+			}
+			table {
+				width: 100%;
+				border-collapse: collapse;
+				background: #111;
+			}
+			th,
+			td {
+				text-align: left;
+				padding: 12px 14px;
+				border-bottom: 1px solid #333;
+				vertical-align: top;
+			}
+			tr:last-child td {
+				border-bottom: 0;
+			}
+			th {
+				font-weight: 400;
+				background: #181818;
+			}
+			td:first-child {
+				white-space: nowrap;
+			}
+			td:nth-child(2) {
+				color: #aaa;
+			}
+			code,
+			a {
+				color: #eee;
+			}
+			a {
+				text-decoration-color: #666;
+				text-underline-offset: 3px;
+			}
+			a:focus-visible {
+				outline: 2px solid #eee;
+				outline-offset: 3px;
+			}
+			footer {
+				color: #777;
+				font-size: 12px;
+				margin-top: 18px;
+			}
+			@media (max-width: 720px) {
+				main {
+					padding-top: 28px;
+				}
+				.grid {
+					grid-template-columns: 1fr 1fr;
+				}
+				.metric:nth-child(n) {
+					border-right: 1px solid #383838;
+					border-bottom: 1px solid #383838;
+				}
+				.metric:nth-child(odd) {
+					border-right: 0;
+				}
+				.metric:nth-last-child(-n + 2) {
+					border-bottom: 0;
+				}
+			}
+			@media (max-width: 460px) {
+				header {
+					align-items: flex-start;
+					flex-direction: column;
+				}
+				.grid {
+					display: block;
+				}
+				.metric:nth-child(n) {
+					border: 0;
+					border-bottom: 1px solid #383838;
+				}
+				.metric:last-child {
+					border-bottom: 0;
+				}
+				.metric {
+					min-height: 100px;
+				}
+			}
+		</style>
+	</head>
+	<body>
+		<main>
+			<header>
+				<div>
+					<div class="eyebrow">device monitor</div>
+					<h1>slisko: <!--CONFIG_NAME--></h1>
+				</div>
+				<div id="connection" class="state off" role="status">
+					connecting
+				</div>
+			</header>
 
-<div class="grid">
- <div class="metric wide"><span class="label">current patterns</span><strong id="patterns" class="value">—</strong><span id="pattern-note" class="sub">loading pattern stack</span></div>
- <div class="metric"><span class="label">average fps</span><strong id="fps" class="value">—</strong><span class="sub">since boot</span></div>
- <div class="metric"><span class="label">current time</span><strong id="clock" class="value">—</strong><span id="date" class="sub">waiting for board clock</span></div>
- <div class="metric"><span class="label">uptime</span><strong id="uptime" class="value">—</strong><span class="sub">without restart</span></div>
- <div class="metric"><span class="label">frames</span><strong id="frames" class="value">—</strong><span id="output-errors" class="sub">—</span></div>
- <div class="metric"><span class="label">ip address</span><strong id="ip" class="value">—</strong><span id="network" class="sub">waiting for network</span></div>
- <div class="metric"><span class="label">board clock</span><strong id="ntp" class="value">—</strong><span id="sync" class="sub">waiting for NTP</span></div>
-</div>
+			<div class="grid">
+				<div class="metric wide">
+					<span class="label">current patterns</span
+					><strong id="patterns" class="value">—</strong
+					><span id="pattern-note" class="sub"
+						>loading pattern stack</span
+					>
+				</div>
+				<div class="metric">
+					<span class="label">average fps</span
+					><strong id="fps" class="value">—</strong
+					><span class="sub">since boot</span>
+				</div>
+				<div class="metric">
+					<span class="label">current time</span
+					><strong id="clock" class="value">—</strong
+					><span id="date" class="sub">waiting for board clock</span>
+				</div>
+				<div class="metric">
+					<span class="label">uptime</span
+					><strong id="uptime" class="value">—</strong
+					><span class="sub">without restart</span>
+				</div>
+				<div class="metric">
+					<span class="label">frames</span
+					><strong id="frames" class="value">—</strong
+					><span id="output-errors" class="sub">—</span>
+				</div>
+				<div class="metric">
+					<span class="label">ip address</span
+					><strong id="ip" class="value">—</strong
+					><span id="network" class="sub">waiting for network</span>
+				</div>
+				<div class="metric">
+					<span class="label">board clock</span
+					><strong id="ntp" class="value">—</strong
+					><span id="sync" class="sub">waiting for NTP</span>
+				</div>
+			</div>
 
-<section>
- <h2>System</h2>
- <div class="detail">
-  <div class="panel"><div class="label">services</div><p id="services">—</p></div>
-  <div class="panel"><div class="label">last report</div><p id="updated">No data received yet.</p><p id="error" class="hidden"></p></div>
- </div>
-</section>
-
-<section>
- <h2>HTTP API</h2>
- <div class="table">
-  <table>
-   <thead><tr><th>GET route</th><th>Purpose</th><th>Result / parameter</th></tr></thead>
-   <tbody>
-    <tr><td><code>/</code></td><td>This live dashboard.</td><td>HTML</td></tr>
-    <tr><td><a href="/health"><code>/health</code></a></td><td>Runtime, network, clock and service health.</td><td>JSON</td></tr>
-    <tr><td><a href="/patterns"><code>/patterns</code></a></td><td>All patterns and their enabled state.</td><td>JSON</td></tr>
-    <tr><td><code>/enable?p=NAME</code></td><td>Enable a pattern. Patterns in the same non-misc category replace each other.</td><td><code>p</code> is a name from <code>/patterns</code></td></tr>
-    <tr><td><code>/disable?p=NAME</code></td><td>Disable a pattern.</td><td><code>p</code> is a name from <code>/patterns</code></td></tr>
-    <tr><td><code>/source?mode=MODE</code></td><td>Select internal rendering or DDP input.</td><td><code>mode=internal</code> or <code>mode=ddp</code></td></tr>
-   </tbody>
-  </table>
- </div>
- <footer>All routes use GET. Status refreshes every 2 seconds; this page has no external assets or libraries.</footer>
-</section>
-</main>
-<script>
-const $=id=>document.getElementById(id),num=new Intl.NumberFormat();
-function duration(s){let d=Math.floor(s/86400),h=Math.floor(s/3600)%24,m=Math.floor(s/60)%60;return(d?d+'d ':'')+(h?h+'h ':'')+m+'m'}
-let timeBase=0,timeRead=0;
-function clock(){let synced=timeBase>0,n=new Date(synced?timeBase*1000+Date.now()-timeRead:Date.now()),zone=synced?'UTC':Intl.DateTimeFormat().resolvedOptions().timeZone;$('clock').textContent=n.toLocaleTimeString([],{hour12:false,timeZone:zone});$('date').textContent=n.toLocaleDateString([],{timeZone:zone})+' · '+(synced?'board UTC':'browser time · awaiting NTP')}
-function response(r){if(!r.ok)throw Error('HTTP '+r.status);return r.json()}
-let busy=false;
-async function poll(){
- if(busy)return;busy=true;
- try{
-  let [h,p]=await Promise.all([fetch('/health',{cache:'no-store'}).then(response),fetch('/patterns',{cache:'no-store'}).then(response)]),active=p.filter(x=>x.enabled).map(x=>x.name),ddp=h.source.rendering==='ddp';
-  $('patterns').textContent=ddp?'DDP input':active.length?active.join(' + '):'none enabled';
-  $('pattern-note').textContent=ddp?'external source active':active.length+' of '+p.length+' enabled'+(h.source.mode==='ddp'?' · DDP selected, awaiting frames':'');
-  $('fps').textContent=h.uptime_s?(h.render.frames/h.uptime_s).toFixed(1):'—';
-  $('uptime').textContent=duration(h.uptime_s);
-  $('frames').textContent=num.format(h.render.frames);
-  $('output-errors').textContent=num.format(h.render.total_output_errors)+' output errors';
-  $('ip').textContent=h.ethernet.ip||'not assigned';
-  $('network').textContent='link '+h.ethernet.link+' · DHCP '+h.ethernet.dhcp;
-  $('ntp').textContent=h.ntp.state;
-  $('sync').textContent=h.ntp.last_sync_age_s==null?'never synchronized':'synced '+duration(h.ntp.last_sync_age_s)+' ago';
-  if(h.ntp.time_unix_s){timeBase=h.ntp.time_unix_s;timeRead=Date.now();clock()}
-  $('services').textContent=Object.entries(h.services).map(([k,v])=>k+' '+v).join(' · ');
-  $('connection').textContent=h.healthy?'healthy':'degraded';
-  $('connection').className='state'+(h.healthy?'':' off');
-  $('updated').textContent='Updated '+new Date().toLocaleTimeString()+'.';
-  $('error').textContent=h.last_error?'Last error: '+h.last_error:'';
-  $('error').className=h.last_error?'':'hidden';
- }catch(e){$('connection').textContent='unreachable';$('connection').className='state off';$('updated').textContent='Update failed: '+e.message+'.';}
- finally{busy=false}
-}
-clock();poll();setInterval(clock,1000);setInterval(poll,2000);
-</script>
-</body>
+			<section>
+				<h2>HTTP API</h2>
+				<div class="table">
+					<table>
+						<thead>
+							<tr>
+								<th>GET route</th>
+								<th>Purpose</th>
+								<th>Result / parameter</th>
+							</tr>
+						</thead>
+						<tbody>
+							<tr>
+								<td><code>/</code></td>
+								<td>This live dashboard.</td>
+								<td>HTML</td>
+							</tr>
+							<tr>
+								<td>
+									<a href="/health"><code>/health</code></a>
+								</td>
+								<td>
+									Runtime, network, clock and service health.
+								</td>
+								<td>JSON</td>
+							</tr>
+							<tr>
+								<td>
+									<a href="/patterns"
+										><code>/patterns</code></a
+									>
+								</td>
+								<td>All patterns and their enabled state.</td>
+								<td>JSON</td>
+							</tr>
+							<tr>
+								<td><code>/enable?p=NAME</code></td>
+								<td>
+									Enable a pattern. Patterns in the same
+									non-misc category replace each other.
+								</td>
+								<td>
+									<code>p</code> is a name from
+									<code>/patterns</code>
+								</td>
+							</tr>
+							<tr>
+								<td><code>/disable?p=NAME</code></td>
+								<td>Disable a pattern.</td>
+								<td>
+									<code>p</code> is a name from
+									<code>/patterns</code>
+								</td>
+							</tr>
+							<tr>
+								<td><code>/source?mode=MODE</code></td>
+								<td>Select internal rendering or DDP input.</td>
+								<td>
+									<code>mode=internal</code> or
+									<code>mode=ddp</code>
+								</td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+			</section>
+		</main>
+		<script>
+			const $ = (id) => document.getElementById(id),
+				num = new Intl.NumberFormat();
+			function duration(s) {
+				let d = Math.floor(s / 86400),
+					h = Math.floor(s / 3600) % 24,
+					m = Math.floor(s / 60) % 60;
+				return (d ? d + "d " : "") + (h ? h + "h " : "") + m + "m";
+			}
+			let timeBase = 0,
+				timeRead = 0;
+			function clock() {
+				let synced = timeBase > 0,
+					n = new Date(
+						synced
+							? timeBase * 1000 + Date.now() - timeRead
+							: Date.now(),
+					),
+					zone = synced
+						? "UTC"
+						: Intl.DateTimeFormat().resolvedOptions().timeZone;
+				$("clock").textContent = n.toLocaleTimeString([], {
+					hour12: false,
+					timeZone: zone,
+				});
+				$("date").textContent =
+					n.toLocaleDateString([], { timeZone: zone }) +
+					" · " +
+					(synced ? "board UTC" : "browser time · awaiting NTP");
+			}
+			function response(r) {
+				if (!r.ok) throw Error("HTTP " + r.status);
+				return r.json();
+			}
+			let busy = false;
+			async function poll() {
+				if (busy) return;
+				busy = true;
+				try {
+					let [h, p] = await Promise.all([
+							fetch("/health", { cache: "no-store" }).then(
+								response,
+							),
+							fetch("/patterns", { cache: "no-store" }).then(
+								response,
+							),
+						]),
+						active = p.filter((x) => x.enabled).map((x) => x.name),
+						ddp = h.source.rendering === "ddp";
+					$("patterns").textContent = ddp
+						? "DDP input"
+						: active.length
+							? active.join(" + ")
+							: "none enabled";
+					$("pattern-note").textContent = ddp
+						? "external source active"
+						: active.length +
+							" of " +
+							p.length +
+							" enabled" +
+							(h.source.mode === "ddp"
+								? " · DDP selected, awaiting frames"
+								: "");
+					$("fps").textContent = h.uptime_s
+						? (h.render.frames / h.uptime_s).toFixed(1)
+						: "—";
+					$("uptime").textContent = duration(h.uptime_s);
+					$("frames").textContent = num.format(h.render.frames);
+					$("output-errors").textContent =
+						num.format(h.render.total_output_errors) +
+						" output errors";
+					$("ip").textContent = h.ethernet.ip || "not assigned";
+					$("network").textContent =
+						"link " +
+						h.ethernet.link +
+						" · DHCP " +
+						h.ethernet.dhcp;
+					$("ntp").textContent = h.ntp.state;
+					$("sync").textContent =
+						h.ntp.last_sync_age_s == null
+							? "never synchronized"
+							: "synced " +
+								duration(h.ntp.last_sync_age_s) +
+								" ago";
+					if (h.ntp.time_unix_s) {
+						timeBase = h.ntp.time_unix_s;
+						timeRead = Date.now();
+						clock();
+					}
+					$("connection").textContent = h.healthy
+						? "healthy"
+						: "degraded";
+					$("connection").className =
+						"state" + (h.healthy ? "" : " off");
+				} catch (e) {
+					$("connection").textContent = "unreachable";
+					$("connection").className = "state off";
+				} finally {
+					busy = false;
+				}
+			}
+			clock();
+			poll();
+			setInterval(clock, 1000);
+			setInterval(poll, 2000);
+		</script>
+	</body>
 </html>

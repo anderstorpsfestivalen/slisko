@@ -90,6 +90,9 @@ fn start(
     })?;
 
     server.fn_handler("/", Method::Get, |req| {
+        let (before_name, after_name) = INDEX_HTML
+            .split_once(CONFIG_NAME_MARKER)
+            .expect("dashboard must contain the configuration name marker");
         let mut resp = req.into_response(
             200,
             Some("OK"),
@@ -98,7 +101,9 @@ fn start(
                 ("Cache-Control", "no-cache"),
             ],
         )?;
-        resp.write_all(INDEX_HTML.as_bytes())?;
+        resp.write_all(before_name.as_bytes())?;
+        resp.write_all(escape_html_text(config::NAME).as_bytes())?;
+        resp.write_all(after_name.as_bytes())?;
         Ok::<(), esp_idf_svc::io::EspIOError>(())
     })?;
 
@@ -204,6 +209,20 @@ fn query_param(uri: &str, key: &str) -> Option<String> {
 }
 
 const INDEX_HTML: &str = include_str!("index.html");
+const CONFIG_NAME_MARKER: &str = "<!--CONFIG_NAME-->";
+
+fn escape_html_text(value: &str) -> String {
+    let mut escaped = String::with_capacity(value.len());
+    for ch in value.chars() {
+        match ch {
+            '&' => escaped.push_str("&amp;"),
+            '<' => escaped.push_str("&lt;"),
+            '>' => escaped.push_str("&gt;"),
+            _ => escaped.push(ch),
+        }
+    }
+    escaped
+}
 
 fn monotonic_ms() -> u64 {
     unsafe { esp_timer_get_time().max(0) as u64 / 1_000 }
