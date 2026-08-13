@@ -12,11 +12,13 @@ fn shared_health_handle_survives_state_transitions() {
     health.update(|snapshot| {
         snapshot.http = health::ServiceState::Retrying;
         snapshot.ddp = health::ServiceState::Stopped;
+        snapshot.mdns = health::ServiceState::Retrying;
     });
     health.record_error("temporary outage");
 
     let snapshot = health.snapshot();
     assert_eq!(snapshot.http, health::ServiceState::Retrying);
     assert_eq!(snapshot.ddp, health::ServiceState::Stopped);
+    assert_eq!(snapshot.mdns, health::ServiceState::Retrying);
     assert_eq!(snapshot.last_error.as_deref(), Some("temporary outage"));
 }

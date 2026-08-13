@@ -43,6 +43,8 @@ pub type Result<T> = std::result::Result<T, BakeError>;
 /// A validated, expanded configuration ready to render as Rust source.
 pub struct BakedConfig {
     source: PathBuf,
+    name: String,
+    hostname: String,
     led_count: usize,
     cards: Vec<CardDefinition>,
     mapping: Vec<Mapping>,
@@ -68,6 +70,8 @@ impl BakedConfig {
 
     /// Render the static module consumed by `config`.
     pub fn render(&self) -> String {
+        let name = LitStr::new(&self.name, Span::call_site());
+        let hostname = LitStr::new(&self.hostname, Span::call_site());
         let card_tables = self
             .cards
             .iter()
@@ -227,6 +231,7 @@ impl BakedConfig {
         let low_factor = Literal::f32_unsuffixed(self.shaper.low_factor);
 
         let tokens = quote! {
+            #[allow(unused_imports)]
             use crate::{Button, ButtonAction, LedDriver, LedOutput};
             use engine::chassi::LineCardSpec;
             use engine::output::MappingSegment;
@@ -235,6 +240,8 @@ impl BakedConfig {
 
             #(#card_tables)*
 
+            pub const NAME: &str = #name;
+            pub const HOSTNAME: &str = #hostname;
             pub static CHASSIS: &[LineCardSpec] = &[#(#chassis),*];
             pub const LED_COUNT: usize = #led_count;
             pub static OUTPUT_MAPPING: &[MappingSegment] = &[#(#mapping),*];
@@ -283,6 +290,7 @@ fn bake_text(source: &Path, input: &str) -> Result<BakedConfig> {
 }
 
 fn validate_and_expand(source: &Path, raw: RawConfig) -> Result<BakedConfig> {
+    let hostname = validate_name(&raw.name)?;
     if raw.led_amount == 0 {
         return Err(BakeError::new("LEDAmount: must be greater than zero"));
     }
@@ -480,6 +488,8 @@ fn validate_and_expand(source: &Path, raw: RawConfig) -> Result<BakedConfig> {
 
     Ok(BakedConfig {
         source: source.to_owned(),
+        name: raw.name,
+        hostname,
         led_count: raw.led_amount,
         cards,
         mapping,
@@ -489,6 +499,49 @@ fn validate_and_expand(source: &Path, raw: RawConfig) -> Result<BakedConfig> {
         shaper,
         buttons,
     })
+}
+
+fn validate_name(name: &str) -> Result<String> {
+    if name.trim().is_empty() {
+        return Err(BakeError::new("Name: must not be empty"));
+    }
+    if name.contains('\0') {
+        return Err(BakeError::new("Name: must not contain NUL"));
+    }
+    if name.len() > 63 {
+        return Err(BakeError::new(format!(
+            "Name: service instance is {} bytes; mDNS labels are limited to 63 bytes",
+            name.len()
+        )));
+    }
+
+    let mut hostname = String::with_capacity(name.len());
+    let mut separator = false;
+    for ch in name.chars() {
+        if ch.is_ascii_alphanumeric() {
+            if separator && !hostname.is_empty() {
+                hostname.push('-');
+            }
+            hostname.push(ch.to_ascii_lowercase());
+            separator = false;
+        } else if !hostname.is_empty() {
+            separator = true;
+        }
+    }
+
+    if hostname.is_empty() {
+        return Err(BakeError::new(
+            "Name: must contain at least one ASCII letter or digit for the mDNS hostname",
+        ));
+    }
+    if hostname.len() > 63 {
+        return Err(BakeError::new(format!(
+            "Name: derived mDNS hostname is {} bytes; DNS labels are limited to 63 bytes",
+            hostname.len()
+        )));
+    }
+
+    Ok(hostname)
 }
 
 fn validate_patterns(field: &str, patterns: &[String]) -> Result<()> {
@@ -540,6 +593,8 @@ fn parse_gpio(value: &str, field: &str) -> Result<u8> {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawConfig {
+    #[serde(rename = "Name")]
+    name: String,
     #[serde(rename = "LEDAmount")]
     led_amount: usize,
     #[serde(rename = "Linecards")]
@@ -1067,6 +1122,8 @@ mod tests {
     #[test]
     fn bakes_9010_catalog_and_outputs() {
         let baked = bake_path(config_path("9010.toml")).unwrap();
+        assert_eq!(baked.name, "ASR 9010");
+        assert_eq!(baked.hostname, "asr-9010");
         assert_eq!(baked.led_count, 145);
         assert_eq!(baked.cards.len(), 10);
         assert_eq!(baked.cards[0].name, "A9K-40GE-L");
@@ -1111,6 +1168,8 @@ mod tests {
         assert_eq!(baked.buttons[2].patterns, ["pride"]);
         let rendered = baked.render();
         syn::parse_file(&rendered).expect("rendered 9010 configuration must be valid Rust");
+        assert!(rendered.contains("pub const NAME: &str = \"ASR 9010\";"));
+        assert!(rendered.contains("pub const HOSTNAME: &str = \"asr-9010\";"));
         assert!(rendered.contains("pub const LED_COUNT: usize = 145;"));
         assert_eq!(rendered.matches("MappingSegment::Gap(1)").count(), 5);
     }
@@ -1118,6 +1177,8 @@ mod tests {
     #[test]
     fn bakes_7609_catalog_and_mapping() {
         let baked = bake_path(config_path("7609.toml")).unwrap();
+        assert_eq!(baked.name, "Cisco 7609");
+        assert_eq!(baked.hostname, "cisco-7609");
         assert_eq!(baked.led_count, 131);
         assert_eq!(baked.cards.len(), 9);
         assert_eq!(baked.cards[0].positions.len(), 49);
@@ -1148,12 +1209,44 @@ mod tests {
         assert_eq!(baked.mapping.len(), 11);
         let rendered = baked.render();
         syn::parse_file(&rendered).expect("rendered 7609 configuration must be valid Rust");
+        assert!(rendered.contains("pub const NAME: &str = \"Cisco 7609\";"));
+        assert!(rendered.contains("pub const HOSTNAME: &str = \"cisco-7609\";"));
         assert!(rendered.contains("MappingSegment::Gap(1)"));
+    }
+
+    #[test]
+    fn derives_a_dns_safe_hostname_from_name() {
+        assert_eq!(validate_name("Cisco__ 7609!!").unwrap(), "cisco-7609");
+        assert_eq!(validate_name("--ASR 9010--").unwrap(), "asr-9010");
+    }
+
+    #[test]
+    fn rejects_missing_or_invalid_mdns_names() {
+        let missing = r#"
+            LEDAmount = 1
+            Linecards = ["blank"]
+            Mapping = [{ gen = 1 }]
+        "#;
+        let error = bake_text(Path::new("bad.toml"), missing).err().unwrap();
+        assert!(error.to_string().contains("Name"));
+
+        for (name, expected) in [
+            ("", "must not be empty"),
+            ("network\0name", "must not contain NUL"),
+            ("---", "ASCII letter or digit"),
+        ] {
+            let error = validate_name(name).unwrap_err();
+            assert!(error.to_string().contains(expected));
+        }
+
+        let error = validate_name(&"a".repeat(64)).unwrap_err();
+        assert!(error.to_string().contains("limited to 63 bytes"));
     }
 
     #[test]
     fn rejects_unknown_patterns_in_buttons() {
         let input = r#"
+            Name = "Test"
             LEDAmount = 1
             Linecards = ["blank"]
             Mapping = [{ gen = 1 }]
@@ -1170,6 +1263,7 @@ mod tests {
     #[test]
     fn bakes_all_button_action_kinds() {
         let input = r#"
+            Name = "Test"
             LEDAmount = 1
             Linecards = ["blank"]
             Mapping = [{ gen = 1 }]
@@ -1192,6 +1286,7 @@ mod tests {
     #[test]
     fn rejects_ambiguous_mapping_entries() {
         let input = r#"
+            Name = "Test"
             LEDAmount = 1
             Linecards = ["blank"]
             Mapping = [{ card = 0, gen = 1 }]
@@ -1205,6 +1300,7 @@ mod tests {
     #[test]
     fn rejects_unknown_cards_and_missing_required_fields() {
         let unknown = r#"
+            Name = "Test"
             LEDAmount = 1
             Linecards = ["mystery-card"]
         "#;
@@ -1213,7 +1309,8 @@ mod tests {
             .expect("configuration should be rejected");
         assert!(error.to_string().contains("Linecards[0]"));
 
-        let missing = r#"Linecards = ["blank"]"#;
+        let missing = r#"Name = "Test"
+            Linecards = ["blank"]"#;
         let error = bake_text(Path::new("bad.toml"), missing)
             .err()
             .expect("configuration should be rejected");
@@ -1223,6 +1320,7 @@ mod tests {
     #[test]
     fn rejects_bad_led_ranges_and_types() {
         let malformed = r#"
+            Name = "Test"
             LEDAmount = 10
             Linecards = ["blank"]
             [ledinfo]
@@ -1235,6 +1333,7 @@ mod tests {
         assert!(error.to_string().contains("ledinfo.mapping[0].range"));
 
         let unsupported = r#"
+            Name = "Test"
             LEDAmount = 10
             Linecards = ["blank"]
             [ledinfo]
@@ -1251,6 +1350,7 @@ mod tests {
         let baked = bake_text(
             Path::new("default.toml"),
             r#"
+                Name = "Test"
                 LEDAmount = 1
                 Linecards = ["blank"]
                 Mapping = [{ gen = 1 }]
@@ -1274,6 +1374,7 @@ mod tests {
         let baked = bake_text(
             Path::new("apa.toml"),
             r#"
+                Name = "Test"
                 LEDAmount = 10
                 Linecards = ["blank"]
                 Mapping = [{ gen = 10 }]
@@ -1307,6 +1408,7 @@ mod tests {
         let cases = [
             (
                 r#"
+                    Name = "Test"
                     LEDAmount = 1
                     Linecards = ["blank"]
                     [ledinfo]
@@ -1317,6 +1419,7 @@ mod tests {
             ),
             (
                 r#"
+                    Name = "Test"
                     LEDAmount = 1
                     Linecards = ["blank"]
                     [ledinfo]
@@ -1327,6 +1430,7 @@ mod tests {
             ),
             (
                 r#"
+                    Name = "Test"
                     LEDAmount = 1
                     Linecards = ["blank"]
                     [ledinfo]
@@ -1337,6 +1441,7 @@ mod tests {
             ),
             (
                 r#"
+                    Name = "Test"
                     LEDAmount = 1
                     Linecards = ["blank"]
                     [ledinfo]
@@ -1359,6 +1464,7 @@ mod tests {
     #[test]
     fn rejects_invalid_apa102_temperature_reused_pins_and_chain_limit() {
         let invalid_temperature = r#"
+            Name = "Test"
             LEDAmount = 1
             Linecards = ["blank"]
             [ledinfo]
@@ -1374,6 +1480,7 @@ mod tests {
         );
 
         let reused = r#"
+            Name = "Test"
             LEDAmount = 2
             Linecards = ["blank"]
             [ledinfo]
@@ -1392,6 +1499,7 @@ mod tests {
         );
 
         let too_many = r#"
+            Name = "Test"
             LEDAmount = 3
             Linecards = ["blank"]
             [ledinfo]

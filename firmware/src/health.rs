@@ -39,6 +39,7 @@ pub struct HealthSnapshot {
     pub ntp_restart_attempts: u32,
     pub http: ServiceState,
     pub ddp: ServiceState,
+    pub mdns: ServiceState,
     pub buttons: ServiceState,
     pub last_error: Option<String>,
 }
@@ -61,16 +62,24 @@ impl HealthSnapshot {
             ntp_restart_attempts: 0,
             http: ServiceState::Starting,
             ddp: ServiceState::Starting,
+            mdns: ServiceState::Starting,
             buttons: ServiceState::Starting,
             last_error: None,
         }
     }
 
-    pub fn to_json(&self, now_ms: u64) -> String {
+    pub fn to_json(
+        &self,
+        now_ms: u64,
+        unix_time_s: Option<u64>,
+        ddp_enabled: bool,
+        ddp_active: bool,
+    ) -> String {
         let uptime_s = now_ms.saturating_sub(self.boot_ms) / 1_000;
         let last_sync_age = self
             .ntp_last_sync_ms
             .map(|sync| now_ms.saturating_sub(sync) / 1_000);
+        let unix_time_s = self.ntp_ever_synced.then_some(unix_time_s).flatten();
         let healthy = self.consecutive_output_errors == 0
             && self.ethernet_driver == "started"
             && self.ethernet_link == "up"
@@ -78,19 +87,23 @@ impl HealthSnapshot {
             && self.ntp_state == "synced"
             && self.http == ServiceState::Running
             && self.ddp == ServiceState::Running
+            && self.mdns == ServiceState::Running
             && self.buttons == ServiceState::Running;
 
         format!(
             concat!(
                 "{{\"healthy\":{},\"uptime_s\":{},",
+                "\"source\":{{\"mode\":\"{}\",\"rendering\":\"{}\"}},",
                 "\"render\":{{\"frames\":{},\"consecutive_output_errors\":{},\"total_output_errors\":{}}},",
                 "\"ethernet\":{{\"driver\":\"{}\",\"link\":\"{}\",\"dhcp\":\"{}\",\"ip\":{},\"repair_attempts\":{}}},",
-                "\"ntp\":{{\"state\":\"{}\",\"ever_synced\":{},\"last_sync_age_s\":{},\"restart_attempts\":{}}},",
-                "\"services\":{{\"http\":\"{}\",\"ddp\":\"{}\",\"buttons\":\"{}\"}},",
+                "\"ntp\":{{\"state\":\"{}\",\"ever_synced\":{},\"time_unix_s\":{},\"last_sync_age_s\":{},\"restart_attempts\":{}}},",
+                "\"services\":{{\"http\":\"{}\",\"ddp\":\"{}\",\"mdns\":\"{}\",\"buttons\":\"{}\"}},",
                 "\"last_error\":{}}}"
             ),
             healthy,
             uptime_s,
+            if ddp_enabled { "ddp" } else { "internal" },
+            if ddp_active { "ddp" } else { "internal" },
             self.frames,
             self.consecutive_output_errors,
             self.total_output_errors,
@@ -101,10 +114,12 @@ impl HealthSnapshot {
             self.dhcp_repair_attempts,
             self.ntp_state,
             self.ntp_ever_synced,
+            unix_time_s.map_or_else(|| "null".into(), |time| time.to_string()),
             last_sync_age.map_or_else(|| "null".into(), |age| age.to_string()),
             self.ntp_restart_attempts,
             self.http.as_str(),
             self.ddp.as_str(),
+            self.mdns.as_str(),
             self.buttons.as_str(),
             json_option(self.last_error.as_deref()),
         )
@@ -177,9 +192,12 @@ mod tests {
     fn health_json_reports_degraded_and_escapes_errors() {
         let mut health = HealthSnapshot::new(1_000);
         health.last_error = Some("bad \"link\"\n".into());
-        let json = health.to_json(4_000);
+        let json = health.to_json(4_000, Some(1_000), true, false);
         assert!(json.contains("\"healthy\":false"));
         assert!(json.contains("\"uptime_s\":3"));
+        assert!(json.contains("\"time_unix_s\":null"));
+        assert!(json.contains("\"source\":{\"mode\":\"ddp\",\"rendering\":\"internal\"}"));
+        assert!(json.contains("\"mdns\":\"starting\""));
         assert!(json.contains("bad \\\"link\\\"\\n"));
     }
 
@@ -190,9 +208,20 @@ mod tests {
         health.ethernet_link = "up";
         health.dhcp = "leased";
         health.ntp_state = "synced";
+        health.ntp_ever_synced = true;
         health.http = ServiceState::Running;
         health.ddp = ServiceState::Running;
+        health.mdns = ServiceState::Running;
         health.buttons = ServiceState::Running;
-        assert!(health.to_json(0).contains("\"healthy\":true"));
+        assert!(
+            health
+                .to_json(0, Some(1_000), false, false)
+                .contains("\"healthy\":true")
+        );
+        assert!(
+            health
+                .to_json(0, Some(1_000), false, false)
+                .contains("\"time_unix_s\":1000")
+        );
     }
 }

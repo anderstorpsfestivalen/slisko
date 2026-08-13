@@ -1,14 +1,13 @@
-//! Small HTTP control surface (mirrors slisko's REST API) + mDNS discovery.
+//! Small HTTP control surface mirroring slisko's REST API.
 //!
 //! Endpoints (all GET, query-string args so no path-param routing needed):
-//!   /            — tiny status/help page
+//!   /            — live status dashboard and API reference
+//!   /health      — JSON runtime, network, clock, and service health
 //!   /patterns    — JSON list of {name, category, enabled}
-//!   /enable?p=   — enable a pattern
-//!   /disable?p=  — disable a pattern
+//!   /enable?p=   — enable a named pattern
+//!   /disable?p=  — disable a named pattern
 //!   /source?mode=internal|ddp — switch the pixel source
 //!
-//! mDNS advertises `slisko._http._tcp` on port 80 for discovery.
-
 use std::sync::{Arc, Mutex};
 
 use esp_idf_svc::http::Method;
@@ -24,6 +23,8 @@ use crate::health::{Health, ServiceState, lock_recover};
 use crate::recovery::ExponentialBackoff;
 
 type Shared = Arc<Mutex<Controller>>;
+
+pub const HTTP_PORT: u16 = 80;
 
 pub struct HttpManager {
     server: Option<EspHttpServer<'static>>,
@@ -83,10 +84,20 @@ fn start(
     ddp: Arc<DdpState>,
     health: Health,
 ) -> Result<EspHttpServer<'static>, EspIOError> {
-    let mut server = EspHttpServer::new(&Configuration::default())?;
+    let mut server = EspHttpServer::new(&Configuration {
+        http_port: HTTP_PORT,
+        ..Default::default()
+    })?;
 
     server.fn_handler("/", Method::Get, |req| {
-        let mut resp = req.into_ok_response()?;
+        let mut resp = req.into_response(
+            200,
+            Some("OK"),
+            &[
+                ("Content-Type", "text/html; charset=utf-8"),
+                ("Cache-Control", "no-cache"),
+            ],
+        )?;
         resp.write_all(INDEX_HTML.as_bytes())?;
         Ok::<(), esp_idf_svc::io::EspIOError>(())
     })?;
@@ -94,19 +105,20 @@ fn start(
     let c = ctrl.clone();
     server.fn_handler("/patterns", Method::Get, move |req| {
         let body = patterns_json(&c);
-        let mut resp = req.into_ok_response()?;
+        let mut resp =
+            req.into_response(200, Some("OK"), &[("Content-Type", "application/json")])?;
         resp.write_all(body.as_bytes())?;
         Ok::<(), esp_idf_svc::io::EspIOError>(())
     })?;
 
     let h = health.clone();
+    let d = ddp.clone();
     server.fn_handler("/health", Method::Get, move |req| {
-        let body = h.snapshot().to_json(monotonic_ms());
-        let mut resp = req.into_response(
-            200,
-            Some("OK"),
-            &[("Content-Type", "application/json")],
-        )?;
+        let body = h
+            .snapshot()
+            .to_json(monotonic_ms(), unix_time_s(), d.enabled(), d.active());
+        let mut resp =
+            req.into_response(200, Some("OK"), &[("Content-Type", "application/json")])?;
         resp.write_all(body.as_bytes())?;
         Ok::<(), esp_idf_svc::io::EspIOError>(())
     })?;
@@ -157,7 +169,7 @@ fn start(
         Ok::<(), esp_idf_svc::io::EspIOError>(())
     })?;
 
-    info!("http: control server up on :80");
+    info!("http: control server up on :{HTTP_PORT}");
     Ok(server)
 }
 
@@ -191,11 +203,13 @@ fn query_param(uri: &str, key: &str) -> Option<String> {
     None
 }
 
-const INDEX_HTML: &str = "<!doctype html><meta charset=utf-8><title>slisko</title>\
-<h1>slisko</h1><p>Endpoints: \
-<code>/health</code>, <code>/patterns</code>, <code>/enable?p=NAME</code>, \
-<code>/disable?p=NAME</code>, <code>/source?mode=internal|ddp</code></p>";
+const INDEX_HTML: &str = include_str!("index.html");
 
 fn monotonic_ms() -> u64 {
     unsafe { esp_timer_get_time().max(0) as u64 / 1_000 }
+}
+
+fn unix_time_s() -> Option<u64> {
+    let now = unsafe { esp_idf_svc::sys::time(core::ptr::null_mut()) };
+    u64::try_from(now).ok()
 }

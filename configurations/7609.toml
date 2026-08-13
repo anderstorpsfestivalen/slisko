@@ -1,5 +1,6 @@
 # Cisco 7609
 
+Name = "Cisco 7609"
 # Two physical APA102 chains as recorded in assets/cisco7960-mappings.md:
 # 50 pixels on port 1 followed by 81 pixels on port 2.
 LEDAmount = 131

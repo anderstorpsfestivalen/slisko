@@ -1,5 +1,6 @@
 # ASR 9010
 
+Name = "ASR 9010"
 # Physical pixels transmitted across all eight outputs. This includes the four
 # sacrificial leading pixels configured as "Skip first LED" in WLED and the
 # final unused pixel on port 8.
@@ -17,30 +18,39 @@ Linecards = [
     "a9k-40ge-l",
 ]
 Mapping = [
-    { gen = 1 }, # Port 1: skip first LED
+    { gen = 1 },  # Port 1: skip first LED
     { card = 0 },
     { card = 1 },
     { card = 3 },
-    { gen = 1 }, # Port 4 / RSP0: skip first LED
+    { gen = 1 },  # Port 4 / RSP0: skip first LED
     { card = 4 },
-    { gen = 1 }, # Port 5 / RSP1: skip first LED
+    { gen = 1 },  # Port 5 / RSP1: skip first LED
     { card = 5 },
     { card = 6 },
     { card = 7 },
     { card = 8 },
-    { gen = 1 }, # Port 8: skip first LED
+    { gen = 1 },  # Port 8: skip first LED
     { card = 9 },
-    { gen = 1 }, # Port 8 has 42 logical pixels; the linecard uses 41
+    { gen = 1 },  # Port 8 has 42 logical pixels; the linecard uses 41
 ]
 Patterns = ["greenstatus", "a9k-40ge-l", "a9k-8t-l", "a9k-rsp440-tr"]
 #Patterns = ["mapper"]
 Buttons = [
     # Return to the standard ASR9000 scene.
-    { name = "RSP0 ACO",       pin = "GPIO17", action = "change",    patterns = ["greenstatus", "a9k-40ge-l", "a9k-8t-l", "a9k-rsp440-tr"] },
+    { name = "RSP0 ACO", pin = "GPIO17", action = "change", patterns = [
+        "greenstatus",
+        "a9k-40ge-l",
+        "a9k-8t-l",
+        "a9k-rsp440-tr",
+    ] },
     # Run an aggressive full-chassis white strobe only while held.
-    { name = "RSP1 ACO",       pin = "GPIO33", action = "momentary", patterns = ["strobe"] },
+    { name = "RSP1 ACO", pin = "GPIO33", action = "momentary", patterns = [
+        "strobe",
+    ] },
     # Select the spatial six-color pride flag.
-    { name = "RSP0 LAMP TEST", pin = "GPIO32", action = "change", patterns = ["pride"] },
+    { name = "RSP0 LAMP TEST", pin = "GPIO32", action = "change", patterns = [
+        "pride",
+    ] },
 ]
 
 [traffic_shaper]
@@ -59,11 +69,11 @@ port = 4048
 [ledinfo]
 type = "WS2815"
 mapping = [
-    { data = 1,  range = "0-42" },
-    { data = 2,  range = "42-51" },
-    { data = 3,  range = "51-60" },
-    { data = 4,  range = "60-72" },
-    { data = 5,  range = "72-84" },
+    { data = 1, range = "0-42" },
+    { data = 2, range = "42-51" },
+    { data = 3, range = "51-60" },
+    { data = 4, range = "60-72" },
+    { data = 5, range = "72-84" },
     { data = 12, range = "84-93" },
     { data = 14, range = "93-102" },
     { data = 15, range = "102-145" },

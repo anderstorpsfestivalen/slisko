@@ -1,7 +1,8 @@
 //! slisko firmware for the bong69 / WT32-ETH01 board (ESP32, esp-idf std).
 //!
-//! LED rendering is the primary service. Ethernet, DHCP, SNTP, DDP, HTTP, and
-//! buttons are supervised around it and may degrade without stopping patterns.
+//! LED rendering is the primary service. Ethernet, DHCP, SNTP, DDP, HTTP,
+//! mDNS, and buttons are supervised around it and may degrade without stopping
+//! patterns.
 
 mod apa102;
 mod board;
@@ -9,6 +10,7 @@ mod buttons;
 mod ddp;
 mod health;
 mod http;
+mod mdns;
 mod net;
 mod output;
 mod recovery;
@@ -232,6 +234,7 @@ fn run() -> Result<(), EspError> {
     ];
     let mut buttons = buttons::Buttons::new(header_pins, ctrl.clone(), health.clone());
     let mut http = http::HttpManager::new(ctrl.clone(), ddp_state.clone(), health.clone());
+    let mut mdns = mdns::MdnsManager::new(health.clone());
 
     // --- Render + supervision loop ---
     let start_us = unsafe { esp_timer_get_time() };
@@ -257,6 +260,7 @@ fn run() -> Result<(), EspError> {
             }
             ddp_service.poll(now_ms, network_status.ip_up);
             http.poll(now_ms, network_status.ip_up);
+            mdns.poll(now_ms, network_status.ip_up);
             next_supervision_ms = now_ms.saturating_add(SUPERVISOR_PERIOD_MS);
 
             if hardware_restart_at.is_some_and(|deadline| now_ms >= deadline) {

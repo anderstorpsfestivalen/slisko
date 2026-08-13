@@ -33,6 +33,9 @@ config = { path = "../config" }
 [build-dependencies]
 embuild = "0.33.1"
 
+[[package.metadata.esp-idf-sys.extra_components]]
+remote_component = { name = "espressif/mdns", version = "1.11.3" }
+
 # esp-idf builds are large; optimize even in dev to keep flash size/speed sane.
 [profile.dev]
 debug = true

@@ -17,6 +17,12 @@ The first `firmware` build downloads ESP-IDF (~GB) via `esp-idf-sys`.
 The firmware dependencies and cargo/sdkconfig wiring are already checked in.
 Set `SLISKO_CONFIG` before building to select a non-default configuration.
 
+Each selected configuration must provide a top-level `Name`. The baker keeps
+that value as the human-readable mDNS service instance and derives a lowercase,
+hyphenated `.local` hostname from it. For example, `Name = "Cisco 7609"`
+advertises `Cisco 7609` at `cisco-7609.local` through `_http._tcp` and
+`_slisko._tcp` on port 80, plus `_ddp._udp` on port 4048.
+
 ## Board facts (source: github.com/bobko69/8PortLEDDistro)
 
 - **LED data outputs (clockless WS281x):** GPIO 1, 2, 3, 4, 5, 12, 14, 15.

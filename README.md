@@ -68,5 +68,5 @@ See [INSTALL.md](INSTALL.md) for ESP32 setup and flashing.
 - The 9010 GPIO and button assignments do not match the hard-coded bong69 board
   pin map. Board identity needs to become configuration data before validating
   those pins generically.
-- The old HTTP/WebSocket Vue UI and mDNS behavior are not fully ported.
+- The old HTTP/WebSocket Vue UI is not fully ported.
 - WS281x chip timing still needs verification per supported LED type.
