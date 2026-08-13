@@ -14,7 +14,7 @@ use esp_idf_hal::modem::Modem;
 use esp_idf_svc::eth::{EspEth, EthDriver, RmiiClockConfig, RmiiEth, RmiiEthChipset};
 use esp_idf_svc::eventloop::EspSystemEventLoop;
 use esp_idf_svc::handle::RawHandle;
-use esp_idf_svc::netif::{EspNetif, NetifConfiguration};
+use esp_idf_svc::netif::{EspNetif, NetifConfiguration, NetifStack};
 use esp_idf_svc::nvs::EspDefaultNvsPartition;
 use esp_idf_svc::sys::{
     ESP_ERR_ESP_NETIF_DHCP_ALREADY_STARTED, ESP_OK, EspError, esp_netif_dhcp_status_t,
@@ -22,7 +22,7 @@ use esp_idf_svc::sys::{
     esp_netif_dhcp_status_t_ESP_NETIF_DHCP_STOPPED, esp_netif_dhcpc_get_status,
     esp_netif_dhcpc_start,
 };
-use esp_idf_svc::wifi::{AuthMethod, ClientConfiguration, Configuration, EspWifi};
+use esp_idf_svc::wifi::{AuthMethod, ClientConfiguration, Configuration, EspWifi, WifiDriver};
 use log::{info, warn};
 
 use crate::board::eth as ethpins;
@@ -373,8 +373,7 @@ impl NetworkManager {
                 if let Some(ip) = self.wifi_ip() {
                     info!(
                         "wifi: connected to {:?}, ip = {}",
-                        WIFI_NETWORKS[credential].0,
-                        ip
+                        WIFI_NETWORKS[credential].0, ip
                     );
                     self.wifi_phase = WifiPhase::Connected { credential };
                 } else if now_ms >= deadline_ms {
@@ -554,14 +553,18 @@ fn construct_wifi(
     sysloop: EspSystemEventLoop,
     nvs: EspDefaultNvsPartition,
 ) -> Result<EspWifi<'static>, EspError> {
-    let mut wifi = EspWifi::new(modem, sysloop, Some(nvs))?;
+    let driver = WifiDriver::new(modem, sysloop, Some(nvs))?;
     let mut configuration = NetifConfiguration::wifi_default_client();
-    configuration.key = "WIFI_STA_FALLBACK".try_into().unwrap();
-    configuration.description = "wifi-fb".try_into().unwrap();
     configuration.route_priority = WIFI_ROUTE_PRIORITY;
-    let old_netif = wifi.swap_netif_sta(EspNetif::new_with_conf(&configuration)?)?;
-    drop(old_netif);
-    Ok(wifi)
+    // Keep the standard WIFI_STA_DEF key and `sta` description: Espressif's
+    // mDNS component uses that exact predefined identity to attach its station
+    // responder. Construct both netifs up front so there is never a duplicate
+    // WIFI_STA_DEF while changing only the route priority.
+    EspWifi::wrap_all(
+        driver,
+        EspNetif::new_with_conf(&configuration)?,
+        EspNetif::new(NetifStack::Ap)?,
+    )
 }
 
 fn wifi_configuration(ssid: &str, password: &str) -> Option<Configuration> {
