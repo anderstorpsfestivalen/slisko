@@ -16,6 +16,7 @@ mod net;
 mod network_policy;
 mod output;
 mod recovery;
+mod redundant_power;
 mod time;
 
 use std::sync::{Arc, Mutex};
@@ -236,7 +237,7 @@ fn run() -> Result<(), EspError> {
     // --- Optional runtime services ---
     let ddp_state = ddp::DdpState::new(cfg::LED_COUNT);
     let mut ddp_service = ddp::DdpService::new(ddp_state.clone(), health.clone());
-    let header_pins: Vec<(u8, esp_idf_hal::gpio::AnyInputPin<'static>)> = vec![
+    let mut header_pins: Vec<(u8, esp_idf_hal::gpio::AnyInputPin<'static>)> = vec![
         (17, pins.gpio17.degrade_input()),
         (32, pins.gpio32.degrade_input()),
         (33, pins.gpio33.degrade_input()),
@@ -244,6 +245,10 @@ fn run() -> Result<(), EspError> {
         (35, pins.gpio35.degrade_input()),
         (36, pins.gpio36.degrade_input()),
     ];
+    let mut redundant_power = {
+        let controller = lock_recover(&ctrl);
+        redundant_power::RedundantPowerInputs::new(&mut header_pins, &controller, health.clone())
+    };
     let mut buttons = buttons::Buttons::new(header_pins, ctrl.clone(), health.clone());
     let mut http = http::HttpManager::new(ctrl.clone(), ddp_state.clone(), health.clone());
     let mut mdns = mdns::MdnsManager::new(health.clone());
@@ -281,12 +286,18 @@ fn run() -> Result<(), EspError> {
         }
 
         buttons.poll(now_ms);
+        if let Some(power) = &mut redundant_power {
+            power.poll(now_ms);
+        }
         {
             let mut controller = lock_recover(&ctrl);
             if ddp_state.active() {
                 ddp_state.apply(&strand_map, controller.leds_mut());
             } else {
                 controller.tick_micros(elapsed_us);
+                if let Some(power) = &redundant_power {
+                    power.apply(controller.leds_mut());
+                }
             }
             strand_map.copy_pixels(controller.leds(), &mut mapped_leds);
         }

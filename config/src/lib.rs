@@ -54,6 +54,14 @@ pub struct Button {
     pub patterns: &'static [&'static str],
 }
 
+/// Two active-low inputs that report whether redundant power supplies are
+/// connected. A low GPIO level means that supply is online; the pull-up/high
+/// state means it is offline or disconnected.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct RedundantPower {
+    pub gpios: [u8; 2],
+}
+
 #[allow(clippy::all)]
 mod generated {
     include!(concat!(env!("OUT_DIR"), "/generated.rs"));

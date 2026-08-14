@@ -51,6 +51,11 @@ advertises `Cisco 7609` at `cisco-7609.local` through `_http._tcp` and
 - **Button/sensor headers:** H1=GPIO17/32/33, H2=GPIO34, H3=GPIO35, H4=GPIO36
   (34/35/36 are input-only).
 
+The Cisco 7609 configuration uses GPIO32 and GPIO33 as active-low redundant
+PSU connection inputs. Both low shows a green SUP720 management LED, either
+high shows it red, and both high black out internally rendered patterns. DDP
+frames intentionally remain unmodified.
+
 ## Flash & monitor
 
 The checked-in Cargo runner flashes and starts a 115200-baud monitor. A normal

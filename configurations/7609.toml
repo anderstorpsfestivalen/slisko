@@ -31,6 +31,11 @@ Mapping = [
 ]
 Buttons = []
 
+# Each PSU connection signal is grounded while that supply is online. Internal
+# pull-ups therefore make a high/disconnected input fail safely as offline.
+[redundant_power]
+pins = ["GPIO32", "GPIO33"]
+
 [traffic_shaper]
 enabled = true
 peak_start = 17

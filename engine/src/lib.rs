@@ -20,6 +20,7 @@ pub mod output;
 pub mod pattern;
 pub mod patterns;
 pub mod pixel;
+pub mod redundant_power;
 pub mod traffic;
 pub mod utils;
 
@@ -31,4 +32,5 @@ pub use output::{
 };
 pub use pattern::{BootstrapCtx, Pattern, PatternInfo, RenderInfo};
 pub use pixel::Pixel;
+pub use redundant_power::{RedundantPowerMonitor, RedundantPowerState};
 pub use traffic::{Shaper, ShaperConfig};

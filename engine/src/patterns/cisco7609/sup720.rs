@@ -51,7 +51,7 @@ impl Pattern for SUP720 {
 
         set_all(c, &self.system, 0.2, 1.0, 0.0);
         set_all(c, &self.active, 0.2, 1.0, 0.0);
-        set_all(c, &self.mgmt, 1.0, 0.0, 0.0);
+        set_all(c, &self.mgmt, 0.2, 1.0, 0.0);
         set_all(c, &self.disk0_led, 0.0, disk0, 0.0);
         set_all(c, &self.disk1_led, 0.0, disk1, 0.0);
         set_all(
@@ -136,7 +136,7 @@ mod tests {
         pattern.p2.push(2);
 
         pattern.render(&RenderInfo::default(), &mut chassis);
-        assert_eq!(chassis.leds[0].to_srgb8(), [255, 0, 0]);
+        assert_eq!(chassis.leds[0].to_srgb8(), [51, 255, 0]);
         assert_eq!(chassis.leds[1].to_srgb8(), [0, 255, 0]);
         assert_eq!(chassis.leds[2].to_srgb8(), [0, 255, 0]);
     }

@@ -53,6 +53,7 @@ pub struct BakedConfig {
     led_outputs: Vec<BakedLedOutput>,
     shaper: TrafficShaper,
     buttons: Vec<Button>,
+    redundant_power: Option<BakedRedundantPower>,
 }
 
 impl BakedConfig {
@@ -221,6 +222,14 @@ impl BakedConfig {
                 patterns: &[#(#patterns),*],
             })
         });
+        let redundant_power = self.redundant_power.map_or_else(
+            || quote!(None),
+            |power| {
+                let first = Literal::u8_unsuffixed(power.gpios[0]);
+                let second = Literal::u8_unsuffixed(power.gpios[1]);
+                quote!(Some(RedundantPower { gpios: [#first, #second] }))
+            },
+        );
         let led_count = Literal::usize_unsuffixed(self.led_count);
         let enabled = self.shaper.enabled;
         let peak_start = Literal::f32_unsuffixed(self.shaper.peak_start as f32);
@@ -232,7 +241,7 @@ impl BakedConfig {
 
         let tokens = quote! {
             #[allow(unused_imports)]
-            use crate::{Button, ButtonAction, LedDriver, LedOutput};
+            use crate::{Button, ButtonAction, LedDriver, LedOutput, RedundantPower};
             use engine::chassi::LineCardSpec;
             use engine::output::MappingSegment;
             use engine::pixel::Position;
@@ -258,6 +267,7 @@ impl BakedConfig {
                 low_factor: #low_factor,
             };
             pub static BUTTONS: &[Button] = &[#(#buttons),*];
+            pub static REDUNDANT_POWER: Option<RedundantPower> = #redundant_power;
         };
         let syntax: syn::File = syn::parse2(tokens).expect("generated token stream must be valid");
         let body = prettyplease::unparse(&syntax);
@@ -486,6 +496,44 @@ fn validate_and_expand(source: &Path, raw: RawConfig) -> Result<BakedConfig> {
         });
     }
 
+    let redundant_power = match raw.redundant_power {
+        Some(power) => {
+            if power.pins.len() != 2 {
+                return Err(BakeError::new(format!(
+                    "redundant_power.pins: expected exactly two GPIOs, got {}",
+                    power.pins.len()
+                )));
+            }
+            let first = parse_gpio(&power.pins[0], "redundant_power.pins[0]")?;
+            let second = parse_gpio(&power.pins[1], "redundant_power.pins[1]")?;
+            if first == second {
+                return Err(BakeError::new(format!(
+                    "redundant_power.pins: GPIO{first} is used more than once"
+                )));
+            }
+            for gpio in [first, second] {
+                if button_gpios.contains(&gpio) {
+                    return Err(BakeError::new(format!(
+                        "redundant_power.pins: GPIO{gpio} is also used by a button"
+                    )));
+                }
+            }
+            let target_count = cards
+                .iter()
+                .filter(|card| card.name == "sup720" && card.labeled.contains_key("mgmt"))
+                .count();
+            if target_count != 1 {
+                return Err(BakeError::new(format!(
+                    "redundant_power: expected exactly one sup720 mgmt LED target, got {target_count}"
+                )));
+            }
+            Some(BakedRedundantPower {
+                gpios: [first, second],
+            })
+        }
+        None => None,
+    };
+
     Ok(BakedConfig {
         source: source.to_owned(),
         name: raw.name,
@@ -498,6 +546,7 @@ fn validate_and_expand(source: &Path, raw: RawConfig) -> Result<BakedConfig> {
         led_outputs,
         shaper,
         buttons,
+        redundant_power,
     })
 }
 
@@ -606,6 +655,8 @@ struct RawConfig {
     #[serde(rename = "Buttons", default)]
     buttons: Vec<RawButton>,
     #[serde(default)]
+    redundant_power: Option<RawRedundantPower>,
+    #[serde(default)]
     traffic_shaper: Option<TrafficShaper>,
     #[serde(default, rename = "output")]
     _output: Option<RawOutput>,
@@ -628,6 +679,12 @@ struct RawButton {
     action: RawButtonAction,
     #[serde(default)]
     patterns: Vec<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawRedundantPower {
+    pins: Vec<String>,
 }
 
 #[derive(Clone, Copy, Deserialize)]
@@ -786,6 +843,11 @@ struct Button {
     gpio: u8,
     action: BakedButtonAction,
     patterns: Vec<String>,
+}
+
+#[derive(Clone, Copy)]
+struct BakedRedundantPower {
+    gpios: [u8; 2],
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -1207,11 +1269,85 @@ mod tests {
             .collect::<Vec<_>>();
         assert_eq!(outputs, vec![(1, 2, 0, 50), (4, 3, 50, 131)]);
         assert_eq!(baked.mapping.len(), 11);
+        assert_eq!(baked.redundant_power.unwrap().gpios, [32, 33]);
         let rendered = baked.render();
         syn::parse_file(&rendered).expect("rendered 7609 configuration must be valid Rust");
         assert!(rendered.contains("pub const NAME: &str = \"Cisco 7609\";"));
         assert!(rendered.contains("pub const HOSTNAME: &str = \"cisco-7609\";"));
         assert!(rendered.contains("MappingSegment::Gap(1)"));
+        assert!(rendered.contains("gpios: [32, 33]"));
+    }
+
+    #[test]
+    fn validates_redundant_power_inputs_and_target() {
+        let cases = [
+            (
+                r#"
+                    Name = "Test"
+                    LEDAmount = 9
+                    Linecards = ["sup720"]
+                    Mapping = [{ card = 0 }]
+                    [redundant_power]
+                    pins = ["GPIO32"]
+                "#,
+                "expected exactly two GPIOs",
+            ),
+            (
+                r#"
+                    Name = "Test"
+                    LEDAmount = 9
+                    Linecards = ["sup720"]
+                    Mapping = [{ card = 0 }]
+                    [redundant_power]
+                    pins = ["GPIO32", "GPIO32"]
+                "#,
+                "GPIO32 is used more than once",
+            ),
+            (
+                r#"
+                    Name = "Test"
+                    LEDAmount = 9
+                    Linecards = ["sup720"]
+                    Mapping = [{ card = 0 }]
+                    Buttons = [
+                        { name = "conflict", pin = "GPIO32", action = "change", patterns = [] },
+                    ]
+                    [redundant_power]
+                    pins = ["GPIO32", "GPIO33"]
+                "#,
+                "GPIO32 is also used by a button",
+            ),
+            (
+                r#"
+                    Name = "Test"
+                    LEDAmount = 1
+                    Linecards = ["blank"]
+                    Mapping = [{ gen = 1 }]
+                    [redundant_power]
+                    pins = ["GPIO32", "GPIO33"]
+                "#,
+                "expected exactly one sup720 mgmt LED target",
+            ),
+            (
+                r#"
+                    Name = "Test"
+                    LEDAmount = 9
+                    Linecards = ["sup720"]
+                    Mapping = [{ card = 0 }]
+                    [redundant_power]
+                    pins = ["32", "GPIO33"]
+                "#,
+                "must use the form GPIO23",
+            ),
+        ];
+
+        for (input, expected) in cases {
+            let error = bake_text(Path::new("bad.toml"), input).err().unwrap();
+            assert!(
+                error.to_string().contains(expected),
+                "{error:?} did not contain {expected:?}"
+            );
+        }
     }
 
     #[test]
