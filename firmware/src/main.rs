@@ -302,7 +302,6 @@ fn run() -> Result<(), EspError> {
                 .as_mut()
                 .map(|power| power.prepare_controller(now_ms, &mut controller));
             if ddp_active {
-                controller.advance_traffic_micros(elapsed_us);
                 ddp_state.apply(&strand_map, controller.leds_mut());
             } else {
                 controller.tick_micros(elapsed_us);

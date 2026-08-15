@@ -3,6 +3,7 @@
 use alloc::vec::Vec;
 
 use crate::faker::Rng;
+use crate::pattern::LinkActivation;
 use crate::pixel::Pixel;
 
 pub const POST_AMBER_MS: u64 = 10_000;
@@ -10,6 +11,13 @@ pub const POST_SWEEP_STEP_MS: u64 = 90;
 pub const POST_BLACK_MS: u64 = 8_000;
 pub const POST_TRAFFIC_RAMP_MS: u64 = 30_000;
 pub const POST_NEGOTIATION_MAX_MS: u64 = 5_000;
+
+/// One link LED in both controller-logical and output-physical coordinates.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct NegotiatingLink {
+    pub logical_led: usize,
+    pub physical_led: usize,
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RedundantPowerState {
@@ -173,7 +181,7 @@ enum SequenceMode {
 /// frame override is applied.
 pub struct PowerOnSequence {
     sweep_order: Vec<usize>,
-    negotiation_leds: Vec<usize>,
+    negotiation_links: Vec<NegotiatingLink>,
     negotiation_delays_ms: Vec<u64>,
     rng: Rng,
     mode: SequenceMode,
@@ -181,11 +189,15 @@ pub struct PowerOnSequence {
 }
 
 impl PowerOnSequence {
-    pub fn new(sweep_order: Vec<usize>, negotiation_leds: Vec<usize>, seed: u64) -> Self {
-        let negotiation_delays_ms = alloc::vec![0; negotiation_leds.len()];
+    pub fn new(
+        sweep_order: Vec<usize>,
+        negotiation_links: Vec<NegotiatingLink>,
+        seed: u64,
+    ) -> Self {
+        let negotiation_delays_ms = alloc::vec![0; negotiation_links.len()];
         Self {
             sweep_order,
-            negotiation_leds,
+            negotiation_links,
             negotiation_delays_ms,
             rng: Rng::new(seed),
             mode: SequenceMode::Initializing,
@@ -285,6 +297,18 @@ impl PowerOnSequence {
         }
     }
 
+    /// Logical activation plan generated for the current POST cycle.
+    pub fn link_activations(&self) -> Vec<LinkActivation> {
+        self.negotiation_links
+            .iter()
+            .zip(&self.negotiation_delays_ms)
+            .map(|(link, &delay_ms)| LinkActivation {
+                led: link.logical_led,
+                delay_ms: delay_ms as u32,
+            })
+            .collect()
+    }
+
     /// Apply physical output ownership. Ramp leaves status/panel LEDs visible
     /// immediately while holding each link LED black for its negotiation delay.
     pub fn apply_physical(&self, status: PowerSequenceStatus, leds: &mut [Pixel]) {
@@ -302,13 +326,13 @@ impl PowerOnSequence {
                 }
             }
             PowerSequencePhase::Ramp => {
-                for (&index, &delay_ms) in self
-                    .negotiation_leds
+                for (link, &delay_ms) in self
+                    .negotiation_links
                     .iter()
                     .zip(&self.negotiation_delays_ms)
                 {
                     if status.negotiation_elapsed_ms < delay_ms
-                        && let Some(pixel) = leds.get_mut(index)
+                        && let Some(pixel) = leds.get_mut(link.physical_led)
                     {
                         pixel.set_clamped(0.0, 0.0, 0.0);
                     }
@@ -328,6 +352,13 @@ fn fill(leds: &mut [Pixel], r: f32, g: f32, b: f32) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn link(logical_led: usize, physical_led: usize) -> NegotiatingLink {
+        NegotiatingLink {
+            logical_led,
+            physical_led,
+        }
+    }
 
     fn lit_leds() -> [Pixel; 3] {
         let mut leds = [Pixel::new(); 3];
@@ -410,7 +441,11 @@ mod tests {
 
     #[test]
     fn online_at_initialization_skips_post_but_both_off_arms_it() {
-        let mut sequence = PowerOnSequence::new((0..3).collect(), vec![0, 1, 2], 1);
+        let mut sequence = PowerOnSequence::new(
+            (0..3).collect(),
+            vec![link(0, 0), link(1, 1), link(2, 2)],
+            1,
+        );
         sequence.observe_power(RedundantPowerState::Healthy, 30);
         assert_eq!(sequence.update(30).phase, PowerSequencePhase::Normal);
 
@@ -488,7 +523,7 @@ mod tests {
 
     #[test]
     fn ramp_reveals_only_link_leds_after_their_negotiation_delays() {
-        let mut sequence = PowerOnSequence::new(vec![0, 1, 2], vec![0, 2], 7);
+        let mut sequence = PowerOnSequence::new(vec![0, 1, 2], vec![link(10, 0), link(20, 2)], 7);
         sequence.negotiation_delays_ms = vec![1_000, 4_000];
         sequence.mode = SequenceMode::Post { started_ms: 0 };
         sequence.restart_emitted = true;
@@ -505,5 +540,19 @@ mod tests {
         let status = sequence.update(ramp_start + POST_NEGOTIATION_MAX_MS);
         sequence.apply_physical(status, &mut leds);
         assert!(leds.iter().all(|pixel| pixel.to_srgb8() == [102, 127, 153]));
+
+        assert_eq!(
+            sequence.link_activations(),
+            vec![
+                LinkActivation {
+                    led: 10,
+                    delay_ms: 1_000,
+                },
+                LinkActivation {
+                    led: 20,
+                    delay_ms: 4_000,
+                },
+            ]
+        );
     }
 }

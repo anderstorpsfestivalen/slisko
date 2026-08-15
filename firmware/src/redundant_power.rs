@@ -6,8 +6,8 @@ use log::{info, warn};
 use engine::controller::Controller;
 use engine::output::StrandMap;
 use engine::{
-    PowerOnSequence, PowerSequencePhase, PowerSequenceStatus, RedundantPowerMonitor,
-    RedundantPowerState,
+    NegotiatingLink, PowerOnSequence, PowerSequencePhase, PowerSequenceStatus,
+    RedundantPowerMonitor, RedundantPowerState,
 };
 
 use crate::health::Health;
@@ -41,9 +41,18 @@ impl RedundantPowerInputs {
             .expect("baker requires a sup720 mgmt LED for redundant power");
         let card_order = (0..controller.chassi().linecards.len()).collect::<Vec<_>>();
         let sweep_order = strand_map.physical_order_by_cards(controller.chassi(), &card_order);
-        let negotiation_leds =
-            strand_map.physical_indices_for_logical(controller.chassi().link_ports());
-        let negotiation_led_count = negotiation_leds.len();
+        let logical_links = controller.chassi().link_ports();
+        let physical_links = strand_map.physical_indices_for_logical(logical_links);
+        let negotiation_links = logical_links
+            .iter()
+            .copied()
+            .zip(physical_links)
+            .map(|(logical_led, physical_led)| NegotiatingLink {
+                logical_led,
+                physical_led,
+            })
+            .collect::<Vec<_>>();
+        let negotiation_led_count = negotiation_links.len();
         assert_eq!(
             sweep_order.len(),
             strand_map.len(),
@@ -89,7 +98,7 @@ impl RedundantPowerInputs {
             pins,
             last_raw: [None; 2],
             monitor: RedundantPowerMonitor::new(DEBOUNCE_MS),
-            sequence: PowerOnSequence::new(sweep_order, negotiation_leds, seed ^ 0x7609_504f_5354),
+            sequence: PowerOnSequence::new(sweep_order, negotiation_links, seed ^ 0x7609_504f_5354),
             last_phase: PowerSequencePhase::Initializing,
             mgmt_led,
         };
@@ -167,8 +176,8 @@ impl RedundantPowerInputs {
             self.last_phase = status.phase;
         }
         if status.restart_traffic {
-            info!("redundant power: restarting scene at zero traffic for 30s ramp");
-            controller.restart_traffic();
+            info!("redundant power: restarting link traffic at zero for 30s ramp");
+            controller.restart_link_traffic(now_ms as u32, &self.sequence.link_activations());
         }
         controller.set_traffic_scale(status.traffic_scale);
         status

@@ -11,7 +11,7 @@ use alloc::vec::Vec;
 
 use crate::chassi::Chassi;
 use crate::faker::Rng;
-use crate::pattern::{BootstrapCtx, BoxedPattern, PatternInfo, RenderInfo};
+use crate::pattern::{BootstrapCtx, BoxedPattern, LinkActivation, PatternInfo, RenderInfo};
 use crate::patterns;
 use crate::traffic::Shaper;
 
@@ -69,9 +69,6 @@ pub struct Controller {
     /// Fractional hour-of-day fed to the shaper (from SNTP on-device).
     hour: f32,
     traffic_scale: f32,
-    traffic_micros: u64,
-    traffic_fraction_micros: f32,
-    last_tick_micros: Option<u64>,
     frame: i64,
     active: Vec<BoxedPattern>,
 }
@@ -84,9 +81,6 @@ impl Controller {
             rng: Rng::new(seed),
             hour: 0.0,
             traffic_scale: 1.0,
-            traffic_micros: 0,
-            traffic_fraction_micros: 0.0,
-            last_tick_micros: None,
             frame: 0,
             active: Vec::new(),
         }
@@ -103,17 +97,16 @@ impl Controller {
         self.traffic_scale = scale.clamp(0.0, 1.0);
     }
 
-    /// Rebuild the current scene and restart its traffic fakers from a stopped
-    /// clock. Pattern selection and render order are preserved.
-    pub fn restart_traffic(&mut self) {
-        let names = self.active_pattern_names();
-        self.active.clear();
-        self.blank();
-        self.traffic_micros = 0;
-        self.traffic_fraction_micros = 0.0;
-        self.last_tick_micros = None;
-        for name in names {
-            self.enable(name);
+    /// Current NTP-shaped traffic intensity including temporary ramp scaling.
+    pub fn traffic_intensity(&self) -> f32 {
+        self.shaper.intensity(self.hour) * self.traffic_scale
+    }
+
+    /// Restart only link-traffic timing. Pattern selection, render order, and
+    /// persistent port identities (such as dead/amber assignments) survive.
+    pub fn restart_link_traffic(&mut self, now_ms: u32, activations: &[LinkActivation]) {
+        for pattern in &mut self.active {
+            pattern.restart_link_traffic(now_ms, activations);
         }
     }
 
@@ -214,54 +207,39 @@ impl Controller {
     }
 
     /// Render one frame from an integer elapsed-microsecond clock. Pattern
-    /// waves retain their `f32` seconds, while the many faker deadline checks
-    /// use precise wrapping integer milliseconds.
+    /// waves retain their `f32` seconds, while deadline checks use precise
+    /// wrapping integer milliseconds.
     pub fn tick_micros(&mut self, elapsed_micros: u64) {
-        self.advance_traffic_micros(elapsed_micros);
         self.render_tick(
             elapsed_micros as f32 / 1_000_000.0,
             (elapsed_micros / 1_000) as u32,
         );
     }
 
-    /// Globals render first so other patterns paint on top (mirrors the Go
-    /// render order).
+    /// Card/status patterns build the normal scene first. Full-chassis global
+    /// effects render last so patterns such as Pride, blackout, and lamp test
+    /// own every final pixel while enabled.
     fn render_tick(&mut self, now_secs: f32, now_millis: u32) {
         let info = RenderInfo {
             secs: now_secs,
             millis: now_millis,
-            traffic_millis: (self.traffic_micros / 1_000) as u32,
+            traffic_intensity: self.traffic_intensity(),
             frame: self.frame,
         };
         // SAFETY-of-borrows: split the &mut self borrow — patterns need &mut
         // chassi while iterating &mut active. They are distinct fields.
         let (active, chassi) = (&mut self.active, &mut self.chassi);
         for p in active.iter_mut() {
-            if p.info().category == "global" {
-                p.render(&info, chassi);
-            }
-        }
-        for p in active.iter_mut() {
             if p.info().category != "global" {
                 p.render(&info, chassi);
             }
         }
+        for p in active.iter_mut() {
+            if p.info().category == "global" {
+                p.render(&info, chassi);
+            }
+        }
         self.frame += 1;
-    }
-
-    /// Advance only the virtual traffic clock without rendering. External
-    /// sources such as DDP use this to keep internal activity synchronized
-    /// while they temporarily own the pixel buffer.
-    pub fn advance_traffic_micros(&mut self, elapsed_micros: u64) {
-        let Some(previous) = self.last_tick_micros.replace(elapsed_micros) else {
-            return;
-        };
-        let elapsed = elapsed_micros.saturating_sub(previous);
-        let rate = self.shaper.intensity(self.hour) * self.traffic_scale;
-        let scaled = elapsed as f32 * rate + self.traffic_fraction_micros;
-        let whole = scaled as u64;
-        self.traffic_fraction_micros = scaled - whole as f32;
-        self.traffic_micros = self.traffic_micros.wrapping_add(whole);
     }
 }
 
@@ -335,33 +313,58 @@ mod tests {
     }
 
     #[test]
-    fn traffic_clock_tracks_live_hour_and_startup_scale() {
+    fn traffic_intensity_tracks_live_hour_and_startup_scale() {
         let mut c = ctrl();
         c.set_hour(19.0);
-        c.tick_micros(0);
-        c.tick_micros(1_000_000);
-        assert_eq!(c.traffic_micros, 1_000_000);
+        assert_eq!(c.traffic_intensity(), 1.0);
 
         c.set_traffic_scale(0.5);
-        c.tick_micros(2_000_000);
-        assert_eq!(c.traffic_micros, 1_500_000);
+        assert_eq!(c.traffic_intensity(), 0.5);
 
         c.set_hour(4.0);
-        c.tick_micros(3_000_000);
-        assert_eq!(c.traffic_micros, 1_600_000);
+        assert!((c.traffic_intensity() - 0.1).abs() < 1e-6);
     }
 
     #[test]
-    fn restarting_traffic_preserves_the_active_scene_and_stops_catchup() {
+    fn restarting_link_traffic_preserves_the_active_scene() {
         let mut c = ctrl();
         c.enable("greenstatus");
         c.enable("a9k-8t-l");
-        c.tick_micros(0);
-        c.tick_micros(1_000_000);
-        c.restart_traffic();
+        c.restart_link_traffic(
+            1_000,
+            &[LinkActivation {
+                led: 0,
+                delay_ms: 500,
+            }],
+        );
         assert_eq!(c.active_pattern_names(), ["greenstatus", "a9k-8t-l"]);
-        assert_eq!(c.traffic_micros, 0);
-        c.tick_micros(10_000_000);
-        assert_eq!(c.traffic_micros, 0);
+    }
+
+    #[test]
+    fn pride_owns_the_final_frame_over_active_link_patterns() {
+        static ASR_SPECS: &[LineCardSpec] = &[LineCardSpec {
+            name: "A9K-8T-L",
+            image: "",
+            active: true,
+            positions: POS,
+            link: &[0, 1, 2, 3],
+            status: None,
+            labeled: &[],
+        }];
+        let make_controller =
+            || Controller::new(Chassi::from_specs(ASR_SPECS), Shaper::default(), 7);
+        let mut layered = make_controller();
+        layered.enable("a9k-8t-l");
+        layered.enable("pride");
+        let mut pride_only = make_controller();
+        pride_only.enable("pride");
+
+        for elapsed_micros in [0, 250_000, 1_000_000, 12_000_000] {
+            layered.tick_micros(elapsed_micros);
+            pride_only.tick_micros(elapsed_micros);
+            assert_eq!(layered.leds(), pride_only.leds());
+        }
+        assert!(layered.is_active("a9k-8t-l"));
+        assert!(layered.is_active("pride"));
     }
 }

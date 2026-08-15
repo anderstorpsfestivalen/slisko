@@ -75,7 +75,9 @@ mod tests {
 
     use super::*;
     use engine::chassi::Chassi;
+    use engine::controller::Controller;
     use engine::output::StrandMap;
+    use engine::traffic::Shaper;
     use std::vec::Vec;
 
     #[test]
@@ -113,5 +115,26 @@ mod tests {
         let mgmt_physical = map.physical_indices_for_logical(&[mgmt])[0];
         assert_eq!(negotiating.len(), 115);
         assert!(!negotiating.contains(&mgmt_physical));
+    }
+
+    #[test]
+    fn standard_scene_renders_every_configured_link() {
+        let chassi = Chassi::from_specs(CHASSIS);
+        let links = chassi.link_ports().to_vec();
+        let mut controller = Controller::new(chassi, Shaper::new(SHAPER), 7);
+        for &pattern in ACTIVE_PATTERNS {
+            controller.enable(pattern);
+        }
+        controller.tick_micros(0);
+
+        let dark = links
+            .iter()
+            .copied()
+            .filter(|&index| controller.leds()[index].to_srgb8() == [0, 0, 0])
+            .collect::<Vec<_>>();
+        assert!(
+            dark.is_empty(),
+            "standard {NAME} scene left logical link LEDs dark: {dark:?}"
+        );
     }
 }

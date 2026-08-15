@@ -1,4 +1,6 @@
-use crate::patterns::blinkstyle::{BlinkStyle, ColorStyle};
+use crate::patterns::blinkstyle::{
+    ActivityEffect, ActivityProfile, BlinkStyle, ColorStyle, MillisRange,
+};
 
 /// Cisco 7609 link LEDs use solid red for down/dead ports. Healthy ports are
 /// green for gigabit or orange for 100 Mbit/s.
@@ -16,16 +18,21 @@ pub(crate) const COLOR_100MBIT: ColorStyle = ColorStyle {
 pub(crate) const PORT_100MBIT_CHANCE: f32 = 0.05;
 const SURVIVOR_100MBIT_CHANCE: f32 = PORT_100MBIT_CHANCE / (1.0 - DEAD_PORT_CHANCE);
 
+pub(crate) const DENSE_ACTIVITY: ActivityProfile = ActivityProfile::new(
+    [0.55, 0.35, 0.10],
+    MillisRange::new(70, 161),
+    MillisRange::new(35, 81),
+    [0.20, 0.45],
+);
+pub(crate) const UPLINK_ACTIVITY: ActivityProfile = ActivityProfile::new(
+    [0.05, 0.25, 0.70],
+    MillisRange::new(70, 161),
+    MillisRange::new(35, 81),
+    [0.20, 0.45],
+);
+
 pub(crate) fn cisco7609_style() -> BlinkStyle {
     BlinkStyle {
-        min_interval: 0.1,
-        max_interval: 7.0,
-        min_blink: 0.1,
-        max_blink: 12.0,
-        min_blinks: 15.0,
-        max_blinks: 40.0,
-        min_cycle: 1.0,
-        max_cycle: 10.0,
         slow_color: COLOR_100MBIT,
         fast_color: HEALTHY_COLOR,
         dead_color: ColorStyle {
@@ -35,6 +42,31 @@ pub(crate) fn cisco7609_style() -> BlinkStyle {
         },
         dead_port_chance: DEAD_PORT_CHANCE,
         slow_speed_chance: SURVIVOR_100MBIT_CHANCE,
+        activity: DENSE_ACTIVITY,
+        effect: ActivityEffect::Dim,
+    }
+}
+
+pub(crate) fn cisco7609_uplink_style() -> BlinkStyle {
+    BlinkStyle {
+        slow_color: HEALTHY_COLOR,
+        fast_color: HEALTHY_COLOR,
+        dead_color: ColorStyle {
+            r: 1.0,
+            g: 0.0,
+            b: 0.0,
+        },
+        dead_port_chance: DEAD_PORT_CHANCE,
+        slow_speed_chance: 0.0,
+        activity: UPLINK_ACTIVITY,
+        effect: ActivityEffect::Dim,
+    }
+}
+
+pub(crate) fn cisco7609_sup_style() -> BlinkStyle {
+    BlinkStyle {
+        dead_port_chance: 0.0,
+        ..cisco7609_uplink_style()
     }
 }
 
@@ -67,9 +99,24 @@ mod tests {
         let mut port = style.create_port(0, &mut ctx);
         let mut leds = [Pixel::new()];
 
-        port.render(&mut leds, 0);
+        port.render(&mut leds, &crate::pattern::RenderInfo::default());
         assert_eq!(leds[0].to_srgb8(), [255, 0, 0]);
-        port.render(&mut leds, 60_000);
+        port.render(
+            &mut leds,
+            &crate::pattern::RenderInfo {
+                millis: 60_000,
+                ..crate::pattern::RenderInfo::default()
+            },
+        );
         assert_eq!(leds[0].to_srgb8(), [255, 0, 0]);
+    }
+
+    #[test]
+    fn card_groups_have_distinct_core_traffic_mix() {
+        assert_eq!(cisco7609_style().activity.role_weights, [0.55, 0.35, 0.10]);
+        assert_eq!(
+            cisco7609_uplink_style().activity.role_weights,
+            [0.05, 0.25, 0.70]
+        );
     }
 }

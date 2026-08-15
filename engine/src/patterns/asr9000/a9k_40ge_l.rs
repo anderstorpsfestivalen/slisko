@@ -2,7 +2,7 @@ use alloc::vec::Vec;
 
 use super::blinkstyle::asr9000_style;
 use crate::chassi::Chassi;
-use crate::pattern::{BootstrapCtx, Pattern, PatternInfo, RenderInfo};
+use crate::pattern::{BootstrapCtx, LinkActivation, Pattern, PatternInfo, RenderInfo};
 use crate::patterns::blinkstyle::PortState;
 
 /// ASR9000 A9K-40GE-L linecard ports.
@@ -14,7 +14,7 @@ pub struct A9K40GE {
 impl Pattern for A9K40GE {
     fn render(&mut self, info: &RenderInfo, c: &mut Chassi) {
         for port in &mut self.ports {
-            port.render(&mut c.leds, info.traffic_millis);
+            port.render(&mut c.leds, info);
         }
     }
 
@@ -29,6 +29,12 @@ impl Pattern for A9K40GE {
         let style = asr9000_style();
         for index in c.link_indices_of_type("A9K-40GE-L") {
             self.ports.push(style.create_port(index, ctx));
+        }
+    }
+
+    fn restart_link_traffic(&mut self, now_ms: u32, activations: &[LinkActivation]) {
+        for port in &mut self.ports {
+            port.restart_link_traffic(now_ms, activations);
         }
     }
 }

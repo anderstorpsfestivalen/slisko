@@ -30,10 +30,10 @@ pub use faker::Rng;
 pub use output::{
     Apa102Encoder, Apa102Options, ColorOrder, MappingError, MappingSegment, StrandMap, Ws281xType,
 };
-pub use pattern::{BootstrapCtx, Pattern, PatternInfo, RenderInfo};
+pub use pattern::{BootstrapCtx, LinkActivation, Pattern, PatternInfo, RenderInfo};
 pub use pixel::Pixel;
 pub use redundant_power::{
-    PowerOnSequence, PowerSequencePhase, PowerSequenceStatus, RedundantPowerMonitor,
-    RedundantPowerState,
+    NegotiatingLink, PowerOnSequence, PowerSequencePhase, PowerSequenceStatus,
+    RedundantPowerMonitor, RedundantPowerState,
 };
 pub use traffic::{Shaper, ShaperConfig};

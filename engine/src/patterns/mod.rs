@@ -10,7 +10,6 @@ mod colorcycler;
 mod green_status;
 mod lamp_test;
 mod panel_helpers;
-mod port_faker;
 mod pride;
 mod rainbow;
 mod red_status;

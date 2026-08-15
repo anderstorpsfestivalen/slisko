@@ -61,15 +61,17 @@ state transition.
 After both PSUs have been off, reconnecting either supply starts the chassis
 POST: all 131 physical LEDs hold amber for 10 seconds, switch off one at a time
 at 90 ms per LED from the leftmost slot to the rightmost, and remain black for
-8 seconds. The normal scene then restarts with each link LED appearing after an
-independent random 0–5 second negotiation delay while traffic ramps from zero
-to its time-of-day target over 30 seconds. Status and panel LEDs appear
-immediately. Returning both PSUs to off cancels and re-arms the sequence.
+8 seconds. Each link LED then appears after an independent random 0–5 second
+negotiation delay, holds its steady link color for 100–500 ms, and begins its
+own traffic flicker while activity ramps from zero to its time-of-day target
+over 30 seconds. Status and panel LEDs appear immediately. Returning both PSUs
+to off cancels and re-arms the sequence.
 
 The `traffic_shaper.timezone` setting is a POSIX timezone. Both chassis use
-Central European time with automatic CET/CEST changes. Faker-based traffic
-continuously follows the configured low and peak windows after SNTP has
-synchronized; the firmware uses peak intensity as its pre-sync fallback.
+Central European time with automatic CET/CEST changes. Per-port traffic burst
+frequency continuously follows the configured low and peak windows after SNTP
+has synchronized, while visible flicker cadence remains wall-clock fast. The
+firmware uses peak intensity as its pre-sync fallback.
 
 ## Flash & monitor
 

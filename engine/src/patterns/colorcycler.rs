@@ -67,7 +67,7 @@ mod tests {
             &RenderInfo {
                 secs: 0.0,
                 millis: 0,
-                traffic_millis: 0,
+                traffic_intensity: 0.0,
                 frame: 0,
             },
             &mut c,
