@@ -32,5 +32,8 @@ pub use output::{
 };
 pub use pattern::{BootstrapCtx, Pattern, PatternInfo, RenderInfo};
 pub use pixel::Pixel;
-pub use redundant_power::{RedundantPowerMonitor, RedundantPowerState};
+pub use redundant_power::{
+    PowerOnSequence, PowerSequencePhase, PowerSequenceStatus, RedundantPowerMonitor,
+    RedundantPowerState,
+};
 pub use traffic::{Shaper, ShaperConfig};

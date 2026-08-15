@@ -16,7 +16,7 @@ pub struct X6704 {
 impl Pattern for X6704 {
     fn render(&mut self, info: &RenderInfo, c: &mut Chassi) {
         for port in &mut self.ports {
-            let value = utils::invert(port.faker.trig(info.millis));
+            let value = utils::invert(port.faker.trig(info.traffic_millis));
             c.leds[port.port].set_clamped(
                 value * HEALTHY_COLOR.r,
                 value * HEALTHY_COLOR.g,

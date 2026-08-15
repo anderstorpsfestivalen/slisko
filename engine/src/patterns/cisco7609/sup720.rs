@@ -29,23 +29,23 @@ impl Pattern for SUP720 {
         let disk0 = self
             .disk0
             .as_mut()
-            .map(|faker| faker.trig(info.millis))
+            .map(|faker| faker.trig(info.traffic_millis))
             .unwrap_or(0.0);
         let disk1 = self
             .disk1
             .as_mut()
-            .map(|faker| faker.trig(info.millis))
+            .map(|faker| faker.trig(info.traffic_millis))
             .unwrap_or(0.0);
         let port0 = utils::invert(
             self.port0
                 .as_mut()
-                .map(|faker| faker.trig(info.millis))
+                .map(|faker| faker.trig(info.traffic_millis))
                 .unwrap_or(0.0),
         );
         let port1 = utils::invert(
             self.port1
                 .as_mut()
-                .map(|faker| faker.trig(info.millis))
+                .map(|faker| faker.trig(info.traffic_millis))
                 .unwrap_or(0.0),
         );
 

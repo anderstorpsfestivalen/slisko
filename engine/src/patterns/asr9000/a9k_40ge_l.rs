@@ -14,7 +14,7 @@ pub struct A9K40GE {
 impl Pattern for A9K40GE {
     fn render(&mut self, info: &RenderInfo, c: &mut Chassi) {
         for port in &mut self.ports {
-            port.render(&mut c.leds, info.millis);
+            port.render(&mut c.leds, info.traffic_millis);
         }
     }
 

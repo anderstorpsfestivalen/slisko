@@ -54,7 +54,22 @@ advertises `Cisco 7609` at `cisco-7609.local` through `_http._tcp` and
 The Cisco 7609 configuration uses GPIO32 and GPIO33 as active-low redundant
 PSU connection inputs. Both low shows a green SUP720 management LED, either
 high shows it red, and both high black out internally rendered patterns. DDP
-frames intentionally remain unmodified.
+frames intentionally remain unmodified. Firmware logs prefixed `GPIO DEBUG`
+show both raw pin levels at boot, every raw edge, and each debounced combined
+state transition.
+
+After both PSUs have been off, reconnecting either supply starts the chassis
+POST: all 131 physical LEDs hold amber for 10 seconds, switch off one at a time
+at 90 ms per LED from the leftmost slot to the rightmost, and remain black for
+8 seconds. The normal scene then restarts with each link LED appearing after an
+independent random 0–5 second negotiation delay while traffic ramps from zero
+to its time-of-day target over 30 seconds. Status and panel LEDs appear
+immediately. Returning both PSUs to off cancels and re-arms the sequence.
+
+The `traffic_shaper.timezone` setting is a POSIX timezone. Both chassis use
+Central European time with automatic CET/CEST changes. Faker-based traffic
+continuously follows the configured low and peak windows after SNTP has
+synchronized; the firmware uses peak intensity as its pre-sync fallback.
 
 ## Flash & monitor
 
@@ -73,6 +88,13 @@ remain dark until a normal build is flashed again:
 ```sh
 source ~/export-esp.sh
 SLISKO_CONFIG=configurations/9010.toml cargo run --features uart-logs
+```
+
+For the 7609 PSU GPIO trace, select its configuration instead:
+
+```sh
+source ~/export-esp.sh
+SLISKO_CONFIG=configurations/7609.toml cargo run --features uart-logs
 ```
 
 `GET /health` reports the selected transport and IP under `network`, detailed

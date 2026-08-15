@@ -57,10 +57,7 @@ mod tests {
         let mut c = Chassi::from_specs(SPECS);
         let mut p = Static;
         let mut rng = crate::faker::Rng::new(1);
-        let mut ctx = crate::pattern::BootstrapCtx {
-            rng: &mut rng,
-            intensity: 1.0,
-        };
+        let mut ctx = crate::pattern::BootstrapCtx { rng: &mut rng };
         p.bootstrap(&c, &mut ctx);
         p.render(&RenderInfo::default(), &mut c);
         for px in &c.leds {

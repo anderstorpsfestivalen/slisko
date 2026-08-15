@@ -63,10 +63,7 @@ mod tests {
         let mut style = cisco7609_style();
         style.dead_port_chance = 1.0;
         let mut rng = Rng::new(7);
-        let mut ctx = BootstrapCtx {
-            rng: &mut rng,
-            intensity: 1.0,
-        };
+        let mut ctx = BootstrapCtx { rng: &mut rng };
         let mut port = style.create_port(0, &mut ctx);
         let mut leds = [Pixel::new()];
 

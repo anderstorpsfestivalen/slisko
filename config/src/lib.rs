@@ -71,9 +71,12 @@ pub use generated::*;
 
 #[cfg(test)]
 mod tests {
+    extern crate std;
+
     use super::*;
     use engine::chassi::Chassi;
     use engine::output::StrandMap;
+    use std::vec::Vec;
 
     #[test]
     fn generated_mapping_and_output_ranges_are_valid() {
@@ -84,5 +87,31 @@ mod tests {
             let (start, end) = output.range();
             start < end && end <= LED_COUNT
         }));
+    }
+
+    #[test]
+    fn redundant_power_post_order_covers_the_physical_strand_left_to_right() {
+        if NAME != "Cisco 7609" {
+            return;
+        }
+        assert!(REDUNDANT_POWER.is_some());
+
+        let chassi = Chassi::from_specs(CHASSIS);
+        let map = StrandMap::new(&chassi, OUTPUT_MAPPING, LED_COUNT).unwrap();
+        let cards = (0..chassi.linecards.len()).collect::<Vec<_>>();
+        let order = map.physical_order_by_cards(&chassi, &cards);
+        let mut sorted = order.clone();
+        sorted.sort_unstable();
+
+        assert_eq!(order.len(), LED_COUNT);
+        assert_eq!(sorted, (0..LED_COUNT).collect::<Vec<_>>());
+        assert_eq!(&order[..49], &(1..50).collect::<Vec<_>>());
+        assert_eq!(order[49], 0);
+
+        let negotiating = map.physical_indices_for_logical(chassi.link_ports());
+        let mgmt = chassi.leds_with_label_on_type("sup720", "mgmt")[0];
+        let mgmt_physical = map.physical_indices_for_logical(&[mgmt])[0];
+        assert_eq!(negotiating.len(), 115);
+        assert!(!negotiating.contains(&mgmt_physical));
     }
 }

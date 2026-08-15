@@ -61,8 +61,8 @@ impl PortState {
 
 impl BlinkStyle {
     /// Build a [`PortState`] for `port` (mirrors `BlinkStyle.CreatePort`):
-    /// dead-port and slow/fast decisions via the ctx RNG, timings scaled by the
-    /// ctx intensity.
+    /// dead-port and slow/fast decisions via the context RNG. Timing is shaped
+    /// by the controller's virtual traffic clock.
     pub fn create_port(&self, port: usize, ctx: &mut BootstrapCtx) -> PortState {
         if ctx.rng.range_f32(0.0, 1.0) < self.dead_port_chance {
             return PortState {
@@ -79,7 +79,6 @@ impl BlinkStyle {
             self.fast_color
         };
 
-        let inv = 1.0 / ctx.intensity.max(0.1); // scaled_interval divides by intensity
         let blinker = RandomBlinker::new(
             self.min_blinks,
             self.max_blinks,
@@ -89,10 +88,10 @@ impl BlinkStyle {
             Rng::new(ctx.rng.next_seed()),
         );
         let faker = RandomInterval::new(
-            self.min_interval * inv,
-            self.max_interval * inv,
-            self.min_blink * inv,
-            self.max_blink * inv,
+            self.min_interval,
+            self.max_interval,
+            self.min_blink,
+            self.max_blink,
             Box::new(blinker),
             0,
             Rng::new(ctx.rng.next_seed()),

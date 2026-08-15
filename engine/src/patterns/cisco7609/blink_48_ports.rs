@@ -14,7 +14,7 @@ pub struct Blink48Ports {
 impl Pattern for Blink48Ports {
     fn render(&mut self, info: &RenderInfo, c: &mut Chassi) {
         for port in &mut self.ports {
-            port.render(&mut c.leds, info.millis);
+            port.render(&mut c.leds, info.traffic_millis);
         }
     }
 

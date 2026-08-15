@@ -42,11 +42,5 @@ pub fn chassis() -> Chassi {
 
 pub fn bootstrap(pattern: &mut dyn Pattern, chassis: &Chassi) {
     let mut rng = Rng::new(1);
-    pattern.bootstrap(
-        chassis,
-        &mut BootstrapCtx {
-            rng: &mut rng,
-            intensity: 1.0,
-        },
-    );
+    pattern.bootstrap(chassis, &mut BootstrapCtx { rng: &mut rng });
 }

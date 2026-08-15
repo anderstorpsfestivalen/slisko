@@ -232,6 +232,7 @@ impl BakedConfig {
         );
         let led_count = Literal::usize_unsuffixed(self.led_count);
         let enabled = self.shaper.enabled;
+        let timezone = LitStr::new(&self.shaper.timezone, Span::call_site());
         let peak_start = Literal::f32_unsuffixed(self.shaper.peak_start as f32);
         let peak_end = Literal::f32_unsuffixed(self.shaper.peak_end as f32);
         let low_start = Literal::f32_unsuffixed(self.shaper.low_start as f32);
@@ -259,6 +260,7 @@ impl BakedConfig {
             pub static LED_OUTPUTS: &[LedOutput] = &[#(#led_outputs),*];
             pub static SHAPER: ShaperConfig = ShaperConfig {
                 enabled: #enabled,
+                timezone: #timezone,
                 peak_start: #peak_start,
                 peak_end: #peak_end,
                 low_start: #low_start,
@@ -747,10 +749,12 @@ struct RawDdpOutput {
     port: u16,
 }
 
-#[derive(Clone, Copy, Deserialize)]
+#[derive(Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct TrafficShaper {
     enabled: bool,
+    #[serde(default = "default_timezone")]
+    timezone: String,
     peak_start: i32,
     peak_end: i32,
     low_start: i32,
@@ -760,7 +764,7 @@ struct TrafficShaper {
 }
 
 impl TrafficShaper {
-    fn validate(self) -> Result<()> {
+    fn validate(&self) -> Result<()> {
         for (field, hour) in [
             ("traffic_shaper.peak_start", self.peak_start),
             ("traffic_shaper.peak_end", self.peak_end),
@@ -781,6 +785,28 @@ impl TrafficShaper {
                 )));
             }
         }
+        if self.low_factor > self.peak_factor {
+            return Err(BakeError::new(
+                "traffic_shaper.low_factor must not exceed peak_factor",
+            ));
+        }
+        if self.timezone.trim().is_empty() || self.timezone.contains('\0') {
+            return Err(BakeError::new(
+                "traffic_shaper.timezone must be a non-empty POSIX timezone without NUL bytes",
+            ));
+        }
+
+        let spans = [
+            (self.low_end - self.low_start).rem_euclid(24),
+            (self.peak_start - self.low_end).rem_euclid(24),
+            (self.peak_end - self.peak_start).rem_euclid(24),
+            (self.low_start - self.peak_end).rem_euclid(24),
+        ];
+        if spans.contains(&0) || spans.iter().sum::<i32>() != 24 {
+            return Err(BakeError::new(
+                "traffic_shaper windows must occur in circular order low_start, low_end, peak_start, peak_end",
+            ));
+        }
         Ok(())
     }
 }
@@ -789,6 +815,7 @@ impl Default for TrafficShaper {
     fn default() -> Self {
         Self {
             enabled: true,
+            timezone: default_timezone(),
             peak_start: 17,
             peak_end: 22,
             low_start: 2,
@@ -797,6 +824,10 @@ impl Default for TrafficShaper {
             low_factor: 0.2,
         }
     }
+}
+
+fn default_timezone() -> String {
+    "UTC0".into()
 }
 
 enum Mapping {
@@ -1233,6 +1264,7 @@ mod tests {
         assert!(rendered.contains("pub const NAME: &str = \"ASR 9010\";"));
         assert!(rendered.contains("pub const HOSTNAME: &str = \"asr-9010\";"));
         assert!(rendered.contains("pub const LED_COUNT: usize = 145;"));
+        assert!(rendered.contains("timezone: \"CET-1CEST,M3.5.0/2,M10.5.0/3\""));
         assert_eq!(rendered.matches("MappingSegment::Gap(1)").count(), 5);
     }
 
@@ -1274,6 +1306,7 @@ mod tests {
         syn::parse_file(&rendered).expect("rendered 7609 configuration must be valid Rust");
         assert!(rendered.contains("pub const NAME: &str = \"Cisco 7609\";"));
         assert!(rendered.contains("pub const HOSTNAME: &str = \"cisco-7609\";"));
+        assert!(rendered.contains("timezone: \"CET-1CEST,M3.5.0/2,M10.5.0/3\""));
         assert!(rendered.contains("MappingSegment::Gap(1)"));
         assert!(rendered.contains("gpios: [32, 33]"));
     }
@@ -1354,6 +1387,38 @@ mod tests {
     fn derives_a_dns_safe_hostname_from_name() {
         assert_eq!(validate_name("Cisco__ 7609!!").unwrap(), "cisco-7609");
         assert_eq!(validate_name("--ASR 9010--").unwrap(), "asr-9010");
+    }
+
+    #[test]
+    fn validates_traffic_window_order_factors_and_timezone() {
+        for (low_start, low_end, peak_factor, low_factor, timezone, expected) in [
+            (8, 7, 1.0, 0.2, "UTC0", "circular order"),
+            (2, 7, 1.0, 1.1, "UTC0", "must not exceed"),
+            (2, 7, 1.0, 0.2, "", "non-empty POSIX timezone"),
+        ] {
+            let input = format!(
+                r#"
+                    Name = "Test"
+                    LEDAmount = 1
+                    Linecards = ["blank"]
+                    Mapping = [{{ gen = 1 }}]
+                    [traffic_shaper]
+                    enabled = true
+                    timezone = "{timezone}"
+                    peak_start = 17
+                    peak_end = 22
+                    low_start = {low_start}
+                    low_end = {low_end}
+                    peak_factor = {peak_factor}
+                    low_factor = {low_factor}
+                "#
+            );
+            let error = bake_text(Path::new("bad.toml"), &input).err().unwrap();
+            assert!(
+                error.to_string().contains(expected),
+                "{error:?} did not contain {expected:?}"
+            );
+        }
     }
 
     #[test]

@@ -1,4 +1,5 @@
-//! Supervised SNTP time sync feeding the traffic shaper's UTC hour-of-day.
+//! Supervised SNTP time sync feeding the traffic shaper's configured local
+//! hour-of-day.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -24,7 +25,15 @@ pub struct TimeSync {
 }
 
 impl TimeSync {
-    pub fn new(health: Health) -> Self {
+    pub fn new(health: Health, timezone: &'static str) -> Self {
+        // SAFETY: configuration is baked before firmware startup and rejects
+        // interior NULs. This runs before SNTP or render worker threads read
+        // the process environment.
+        unsafe {
+            std::env::set_var("TZ", timezone);
+            esp_idf_svc::sys::tzset();
+        }
+        info!("time: local timezone configured as {timezone}");
         Self {
             sntp: None,
             health,
@@ -35,7 +44,7 @@ impl TimeSync {
     }
 
     /// Advance the SNTP lifecycle without blocking rendering. Returns a valid
-    /// UTC hour once the clock has synchronized at least once this boot.
+    /// configured-local hour once the clock has synchronized at least once.
     pub fn poll(&mut self, now_ms: u64, network: NetworkStatus) -> Option<f32> {
         if !network.ip_up {
             if network.lost_ip {
@@ -101,7 +110,7 @@ impl TimeSync {
                 state.ntp_ever_synced = true;
                 state.ntp_last_sync_ms = Some(now_ms);
             });
-            info!("sntp: synchronized; UTC hour = {:.2}", hour_of_day());
+            info!("sntp: synchronized; local hour = {:.2}", hour_of_day());
         }) {
             Ok(sntp) => {
                 info!("sntp: client started with three pool servers");
@@ -144,13 +153,14 @@ impl TimeSync {
     }
 }
 
-/// Current fractional hour-of-day (0.0..24.0) from the system clock (UTC).
+/// Current fractional hour-of-day (0.0..24.0) in the configured POSIX
+/// timezone.
 pub fn hour_of_day() -> f32 {
     unsafe {
         let t: esp_idf_svc::sys::time_t = esp_idf_svc::sys::time(core::ptr::null_mut());
         let mut tm: esp_idf_svc::sys::tm = core::mem::zeroed();
         esp_idf_svc::sys::localtime_r(&t, &mut tm);
-        tm.tm_hour as f32 + tm.tm_min as f32 / 60.0
+        tm.tm_hour as f32 + tm.tm_min as f32 / 60.0 + tm.tm_sec as f32 / 3600.0
     }
 }
 

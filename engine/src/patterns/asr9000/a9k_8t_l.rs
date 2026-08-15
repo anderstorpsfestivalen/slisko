@@ -15,7 +15,7 @@ pub struct A9K8TL {
 impl Pattern for A9K8TL {
     fn render(&mut self, info: &RenderInfo, c: &mut Chassi) {
         for port in &mut self.ports {
-            if utils::invert(port.faker.trig(info.millis)) == 1.0 {
+            if utils::invert(port.faker.trig(info.traffic_millis)) == 1.0 {
                 c.leds[port.port].set_clamped(0.3, 1.0, 0.0);
             } else {
                 c.leds[port.port].set_clamped(1.0, 0.8, 0.0);

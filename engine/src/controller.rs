@@ -68,6 +68,10 @@ pub struct Controller {
     rng: Rng,
     /// Fractional hour-of-day fed to the shaper (from SNTP on-device).
     hour: f32,
+    traffic_scale: f32,
+    traffic_micros: u64,
+    traffic_fraction_micros: f32,
+    last_tick_micros: Option<u64>,
     frame: i64,
     active: Vec<BoxedPattern>,
 }
@@ -79,6 +83,10 @@ impl Controller {
             shaper,
             rng: Rng::new(seed),
             hour: 0.0,
+            traffic_scale: 1.0,
+            traffic_micros: 0,
+            traffic_fraction_micros: 0.0,
+            last_tick_micros: None,
             frame: 0,
             active: Vec::new(),
         }
@@ -87,6 +95,26 @@ impl Controller {
     /// Update the hour-of-day used by the traffic shaper (call when SNTP ticks).
     pub fn set_hour(&mut self, hour: f32) {
         self.hour = hour;
+    }
+
+    /// Apply an additional activity multiplier, used by the 7609 power-on
+    /// ramp. The time-of-day shaper remains active underneath it.
+    pub fn set_traffic_scale(&mut self, scale: f32) {
+        self.traffic_scale = scale.clamp(0.0, 1.0);
+    }
+
+    /// Rebuild the current scene and restart its traffic fakers from a stopped
+    /// clock. Pattern selection and render order are preserved.
+    pub fn restart_traffic(&mut self) {
+        let names = self.active_pattern_names();
+        self.active.clear();
+        self.blank();
+        self.traffic_micros = 0;
+        self.traffic_fraction_micros = 0.0;
+        self.last_tick_micros = None;
+        for name in names {
+            self.enable(name);
+        }
     }
 
     pub fn chassi(&self) -> &Chassi {
@@ -131,7 +159,7 @@ impl Controller {
 
     /// Enable a pattern by name (mirrors `EnablePattern`): no-op if already on;
     /// disables others in the same category unless that category is `"misc"`;
-    /// bootstraps the fresh instance with a shaper-derived intensity.
+    /// bootstraps the fresh instance against the current chassis.
     pub fn enable(&mut self, name: &str) {
         if self.is_active(name) {
             return;
@@ -144,11 +172,7 @@ impl Controller {
             self.active.retain(|p| p.info().category != category);
         }
 
-        let intensity = self.shaper.intensity(self.hour);
-        let mut ctx = BootstrapCtx {
-            rng: &mut self.rng,
-            intensity,
-        };
+        let mut ctx = BootstrapCtx { rng: &mut self.rng };
         pattern.bootstrap(&self.chassi, &mut ctx);
         self.active.push(pattern);
     }
@@ -186,13 +210,14 @@ impl Controller {
     /// Render one frame at elapsed `now` seconds. Native callers that already
     /// have a higher-resolution integer clock should use [`Self::tick_micros`].
     pub fn tick(&mut self, now: f32) {
-        self.render_tick(now, (now.max(0.0) * 1_000.0) as u32);
+        self.tick_micros((now.max(0.0) * 1_000_000.0) as u64);
     }
 
     /// Render one frame from an integer elapsed-microsecond clock. Pattern
     /// waves retain their `f32` seconds, while the many faker deadline checks
     /// use precise wrapping integer milliseconds.
     pub fn tick_micros(&mut self, elapsed_micros: u64) {
+        self.advance_traffic_micros(elapsed_micros);
         self.render_tick(
             elapsed_micros as f32 / 1_000_000.0,
             (elapsed_micros / 1_000) as u32,
@@ -205,6 +230,7 @@ impl Controller {
         let info = RenderInfo {
             secs: now_secs,
             millis: now_millis,
+            traffic_millis: (self.traffic_micros / 1_000) as u32,
             frame: self.frame,
         };
         // SAFETY-of-borrows: split the &mut self borrow — patterns need &mut
@@ -221,6 +247,21 @@ impl Controller {
             }
         }
         self.frame += 1;
+    }
+
+    /// Advance only the virtual traffic clock without rendering. External
+    /// sources such as DDP use this to keep internal activity synchronized
+    /// while they temporarily own the pixel buffer.
+    pub fn advance_traffic_micros(&mut self, elapsed_micros: u64) {
+        let Some(previous) = self.last_tick_micros.replace(elapsed_micros) else {
+            return;
+        };
+        let elapsed = elapsed_micros.saturating_sub(previous);
+        let rate = self.shaper.intensity(self.hour) * self.traffic_scale;
+        let scaled = elapsed as f32 * rate + self.traffic_fraction_micros;
+        let whole = scaled as u64;
+        self.traffic_fraction_micros = scaled - whole as f32;
+        self.traffic_micros = self.traffic_micros.wrapping_add(whole);
     }
 }
 
@@ -291,5 +332,36 @@ mod tests {
         assert_eq!(c.active_pattern_names(), ["rainbow"]);
         c.replace_patterns(&["greenstatus", "a9k-8t-l"]);
         assert_eq!(c.active_pattern_names(), ["greenstatus", "a9k-8t-l"]);
+    }
+
+    #[test]
+    fn traffic_clock_tracks_live_hour_and_startup_scale() {
+        let mut c = ctrl();
+        c.set_hour(19.0);
+        c.tick_micros(0);
+        c.tick_micros(1_000_000);
+        assert_eq!(c.traffic_micros, 1_000_000);
+
+        c.set_traffic_scale(0.5);
+        c.tick_micros(2_000_000);
+        assert_eq!(c.traffic_micros, 1_500_000);
+
+        c.set_hour(4.0);
+        c.tick_micros(3_000_000);
+        assert_eq!(c.traffic_micros, 1_600_000);
+    }
+
+    #[test]
+    fn restarting_traffic_preserves_the_active_scene_and_stops_catchup() {
+        let mut c = ctrl();
+        c.enable("greenstatus");
+        c.enable("a9k-8t-l");
+        c.tick_micros(0);
+        c.tick_micros(1_000_000);
+        c.restart_traffic();
+        assert_eq!(c.active_pattern_names(), ["greenstatus", "a9k-8t-l"]);
+        assert_eq!(c.traffic_micros, 0);
+        c.tick_micros(10_000_000);
+        assert_eq!(c.traffic_micros, 0);
     }
 }

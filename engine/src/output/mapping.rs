@@ -86,6 +86,69 @@ impl StrandMap {
         self.physical_to_logical.is_empty()
     }
 
+    /// Return every physical pixel exactly once, grouped by a requested
+    /// logical card order. Unmapped pixels immediately preceding a card in the
+    /// physical map follow that card's logical pixels; trailing padding follows
+    /// all card groups. This keeps real card LEDs first while still covering
+    /// every installed pixel.
+    pub fn physical_order_by_cards(&self, chassi: &Chassi, card_order: &[usize]) -> Vec<usize> {
+        let mut groups = alloc::vec![Vec::new(); chassi.linecards.len()];
+        let mut leading_unmapped = alloc::vec![Vec::new(); chassi.linecards.len()];
+        let mut pending_unmapped = Vec::new();
+        let mut trailing = Vec::new();
+
+        for (physical, logical) in self.physical_to_logical.iter().copied().enumerate() {
+            let Some(logical) = logical else {
+                pending_unmapped.push(physical);
+                continue;
+            };
+            let card = chassi.linecards.iter().position(|candidate| {
+                (candidate.led_offset..candidate.led_offset + candidate.led_count)
+                    .contains(&logical)
+            });
+            let Some(card) = card else {
+                trailing.append(&mut pending_unmapped);
+                trailing.push(physical);
+                continue;
+            };
+            leading_unmapped[card].append(&mut pending_unmapped);
+            groups[card].push(physical);
+        }
+        trailing.append(&mut pending_unmapped);
+
+        let mut included = alloc::vec![false; groups.len()];
+        let mut ordered = Vec::with_capacity(self.len());
+        for &card in card_order {
+            if card < groups.len() && !included[card] {
+                ordered.append(&mut groups[card]);
+                ordered.append(&mut leading_unmapped[card]);
+                included[card] = true;
+            }
+        }
+        for (card, group) in groups.iter_mut().enumerate() {
+            if !included[card] {
+                ordered.append(group);
+                ordered.append(&mut leading_unmapped[card]);
+            }
+        }
+        ordered.append(&mut trailing);
+        ordered
+    }
+
+    /// Resolve selected logical LEDs to their physical pixel indices, keeping
+    /// physical strand order and excluding generated/unmapped pixels.
+    pub fn physical_indices_for_logical(&self, logical_indices: &[usize]) -> Vec<usize> {
+        self.physical_to_logical
+            .iter()
+            .enumerate()
+            .filter_map(|(physical, logical)| {
+                logical
+                    .is_some_and(|logical| logical_indices.contains(&logical))
+                    .then_some(physical)
+            })
+            .collect()
+    }
+
     /// Copy logical pixels into a reusable physical-pixel buffer without any
     /// device-specific transfer conversion.
     pub fn copy_pixels(&self, logical: &[Pixel], physical: &mut Vec<Pixel>) {
@@ -212,6 +275,27 @@ mod tests {
             srgb,
             alloc::vec![0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 0]
         );
+    }
+
+    #[test]
+    fn physical_order_groups_leading_gaps_with_the_following_card() {
+        let chassi = Chassi::from_specs(MAP_SPECS);
+        let map = StrandMap::new(
+            &chassi,
+            &[
+                MappingSegment::Card(1),
+                MappingSegment::Gap(1),
+                MappingSegment::Card(0),
+            ],
+            5,
+        )
+        .unwrap();
+
+        assert_eq!(
+            map.physical_order_by_cards(&chassi, &[0, 1]),
+            [2, 3, 1, 0, 4]
+        );
+        assert_eq!(map.physical_indices_for_logical(&[0, 2]), [0, 2]);
     }
 
     #[test]

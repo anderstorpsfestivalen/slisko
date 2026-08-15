@@ -25,16 +25,18 @@ pub struct RenderInfo {
     /// Wrapping whole milliseconds since the controller started. Deadline and
     /// interval logic uses this so it remains precise after long uptimes.
     pub millis: u32,
+    /// Wrapping virtual milliseconds for traffic fakers. This clock advances
+    /// at the live time-of-day intensity and can be held at zero during POST.
+    pub traffic_millis: u32,
     /// Monotonic frame counter.
     pub frame: i64,
 }
 
-/// Context handed to [`Pattern::bootstrap`]: a PRNG (replacing Go's global
-/// `math/rand`) and the traffic-shaper intensity captured at startup (replacing
-/// the per-pattern `GetTrafficShaper()` lookups).
+/// Context handed to [`Pattern::bootstrap`]: a PRNG replacing Go's global
+/// `math/rand`. Traffic shaping is applied continuously by the controller's
+/// virtual traffic clock rather than being captured here.
 pub struct BootstrapCtx<'a> {
     pub rng: &'a mut Rng,
-    pub intensity: f32,
 }
 
 /// A render pattern (mirrors the Go `Pattern` interface).

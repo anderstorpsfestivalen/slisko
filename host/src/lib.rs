@@ -30,7 +30,7 @@ pub struct Args {
     #[arg(long, default_value_t = DEFAULT_SEED)]
     pub seed: u64,
 
-    /// Fixed fractional hour-of-day for the traffic shaper; local time is used when omitted.
+    /// Fixed fractional hour-of-day for the traffic shaper; configured local time is used when omitted.
     #[arg(long, value_parser = parse_hour)]
     pub hour: Option<f32>,
 
@@ -55,6 +55,19 @@ fn local_hour() -> f32 {
     now.hour() as f32 + now.minute() as f32 / 60.0 + now.second() as f32 / 3600.0
 }
 
+fn configure_local_timezone() {
+    // SAFETY: run_with calls this before starting worker threads, and baked
+    // configuration rejects interior NUL bytes.
+    unsafe { std::env::set_var("TZ", config::SHAPER.timezone) };
+    #[cfg(unix)]
+    unsafe {
+        unsafe extern "C" {
+            fn tzset();
+        }
+        tzset();
+    }
+}
+
 pub fn run() {
     if let Err(error) = run_with(Args::parse()) {
         eprintln!("host: {error}");
@@ -63,6 +76,8 @@ pub fn run() {
 }
 
 fn run_with(args: Args) -> Result<(), Box<dyn std::error::Error>> {
+    configure_local_timezone();
+
     let selected_patterns: Vec<&str> = if args.patterns.is_empty() {
         config::ACTIVE_PATTERNS.to_vec()
     } else {
@@ -95,11 +110,12 @@ fn run_with(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     let mut rgb = Vec::with_capacity(strand_map.len() * 3);
 
     eprintln!(
-        "host: streaming {} LEDs at {} fps to {} with [{}]",
+        "host: streaming {} LEDs at {} fps to {} with [{}], timezone {}",
         strand_map.len(),
         args.fps,
         args.ddp,
-        selected_patterns.join(", ")
+        selected_patterns.join(", "),
+        config::SHAPER.timezone,
     );
 
     loop {

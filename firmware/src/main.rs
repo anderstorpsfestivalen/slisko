@@ -89,6 +89,7 @@ fn main() {
 fn run() -> Result<(), EspError> {
     let boot_ms = monotonic_ms();
     let health = Health::new(boot_ms);
+    let mut timesync = time::TimeSync::new(health.clone(), cfg::SHAPER.timezone);
     configure_watchdog(&health);
 
     let peripherals = Peripherals::take()?;
@@ -232,8 +233,6 @@ fn run() -> Result<(), EspError> {
         }
     };
 
-    let mut timesync = time::TimeSync::new(health.clone());
-
     // --- Optional runtime services ---
     let ddp_state = ddp::DdpState::new(cfg::LED_COUNT);
     let mut ddp_service = ddp::DdpService::new(ddp_state.clone(), health.clone());
@@ -247,7 +246,13 @@ fn run() -> Result<(), EspError> {
     ];
     let mut redundant_power = {
         let controller = lock_recover(&ctrl);
-        redundant_power::RedundantPowerInputs::new(&mut header_pins, &controller, health.clone())
+        redundant_power::RedundantPowerInputs::new(
+            &mut header_pins,
+            &controller,
+            &strand_map,
+            seed,
+            health.clone(),
+        )
     };
     let mut buttons = buttons::Buttons::new(header_pins, ctrl.clone(), health.clone());
     let mut http = http::HttpManager::new(ctrl.clone(), ddp_state.clone(), health.clone());
@@ -289,17 +294,26 @@ fn run() -> Result<(), EspError> {
         if let Some(power) = &mut redundant_power {
             power.poll(now_ms);
         }
+        let ddp_active = ddp_state.active();
+        let power_status;
         {
             let mut controller = lock_recover(&ctrl);
-            if ddp_state.active() {
+            power_status = redundant_power
+                .as_mut()
+                .map(|power| power.prepare_controller(now_ms, &mut controller));
+            if ddp_active {
+                controller.advance_traffic_micros(elapsed_us);
                 ddp_state.apply(&strand_map, controller.leds_mut());
             } else {
                 controller.tick_micros(elapsed_us);
-                if let Some(power) = &redundant_power {
-                    power.apply(controller.leds_mut());
+                if let (Some(power), Some(status)) = (&redundant_power, power_status) {
+                    power.apply_logical(status, controller.leds_mut());
                 }
             }
             strand_map.copy_pixels(controller.leds(), &mut mapped_leds);
+        }
+        if !ddp_active && let (Some(power), Some(status)) = (&redundant_power, power_status) {
+            power.apply_physical(status, &mut mapped_leds);
         }
 
         match leds.write(&mapped_leds) {
@@ -408,6 +422,7 @@ fn shaper_config() -> ShaperConfig {
     let s = &cfg::SHAPER;
     ShaperConfig {
         enabled: s.enabled,
+        timezone: s.timezone,
         peak_start: s.peak_start,
         peak_end: s.peak_end,
         low_start: s.low_start,

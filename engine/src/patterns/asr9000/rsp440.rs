@@ -41,12 +41,12 @@ impl Pattern for RSP440 {
         let disk0 = self
             .disk0
             .as_mut()
-            .map(|faker| faker.trig(info.millis))
+            .map(|faker| faker.trig(info.traffic_millis))
             .unwrap_or(0.0);
         let disk1 = self
             .disk1
             .as_mut()
-            .map(|faker| faker.trig(info.millis))
+            .map(|faker| faker.trig(info.traffic_millis))
             .unwrap_or(0.0);
 
         for labels in [&self.se, &self.se2] {

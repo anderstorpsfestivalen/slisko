@@ -55,6 +55,7 @@ Buttons = [
 
 [traffic_shaper]
 enabled = true
+timezone = "CET-1CEST,M3.5.0/2,M10.5.0/3"
 peak_start = 17
 peak_end = 22
 low_start = 2
